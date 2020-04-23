@@ -16,7 +16,8 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<scala.version>2.12</scala.version>
-		<akka.version>2.5.26</akka.version>
+		<akka.version>2.5.27</akka.version>
+		<akka.management.version>1.0.6</akka.management.version>
 	</properties>
 
 	<dependencies>
@@ -45,6 +46,16 @@
 			<groupId>com.typesafe.akka</groupId>
 			<artifactId>akka-cluster-tools_${scala.version}</artifactId>
 			<version>${akka.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.lightbend.akka.management</groupId>
+			<artifactId>akka-management_${scala.version}</artifactId>
+			<version>${akka.management.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.lightbend.akka.management</groupId>
+			<artifactId>akka-management-cluster-http_${scala.version}</artifactId>
+			<version>${akka.management.version}</version>
 		</dependency>
 	</dependencies>
 </project>
