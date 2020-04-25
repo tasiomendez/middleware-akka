@@ -1,5 +1,7 @@
 package it.polimi.middleware.akka.api;
 
+import static akka.http.javadsl.server.PathMatchers.segment;
+
 import akka.actor.ActorSystem;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -31,12 +33,8 @@ public class Router extends AllDirectives {
 	 * @return Route object
 	 */
 	public Route createRouter() {
-		return concat(
-				path("hello", () ->
-				get(() ->
-				complete("<h1>Say hello to akka-http</h1>"))),
-				imports
-				);
+		return ignoreTrailingSlash(() -> concat(this.database(), imports));
+
 	}
 	
 	/**
@@ -49,6 +47,62 @@ public class Router extends AllDirectives {
 	public Router imports(Route... routes) {
 		this.imports = routes;
 		return this;
+	}
+	
+	
+	/**
+	 * Create handlers for URIs that starts like /database.
+	 * 
+	 * @return Route object
+	 */
+	private Route database() {	
+
+		return pathPrefix("database", 
+				() -> get(
+						() -> concat(
+								path(segment("get"), this::onGetRequest),									// database/get
+								path(segment("get").slash(segment()), this::onGetRequest), 					// database/get/:key
+								path(segment("put").slash(segment()).slash(segment()), this::onPutRequest)  // database/put/:key/:value
+								)
+						)
+				);
+	}
+	
+	/**
+	 * Handler which returns a list with all the keys stored
+	 * in the database.
+	 * Path - /database/get
+	 * 
+	 * @return Route object
+	 */
+	private Route onGetRequest() {
+		log.debug("Request received on /database/get");
+		return complete("All keys");
+	}
+	
+	/**
+	 * Handler which search for a unique key on the database
+	 * Path - /database/get/:key
+	 * 
+	 * @param key 
+	 * @return Route object
+	 */
+	private Route onGetRequest(String key) {
+		log.debug("Request received on /database/get/{}", key);
+		return complete(key);
+	}
+	
+	/**
+	 * Add a new key-value to the database.
+	 * Path - /database/put/:key/:value
+	 * 
+	 * @param key
+	 * @param value
+	 * @return Route object
+	 */
+	private Route onPutRequest(String key, String value) {
+		log.debug("Request received on /database/put/{}/{}", key, value);
+		return complete(key + " " + value);
 	}
 
 }
