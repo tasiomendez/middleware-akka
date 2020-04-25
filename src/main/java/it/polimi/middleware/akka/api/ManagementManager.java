@@ -19,19 +19,6 @@ public class ManagementManager {
 	
 	private ManagementManager(ActorSystem system) {
 		this.system = system;
-		this.initialize();
-	}
-	
-	private ManagementManager() {
-		this.system = ActorSystem.create();
-		this.initialize();
-	}
-	
-	/**
-	 * Initialize all the required parameters in order to run
-	 * the specific server.
-	 */
-	private void initialize() {
 		this.management = AkkaManagement.get(this.system);
 		this.log = Logging.getLogger(this.system, this);
 	}
@@ -57,7 +44,7 @@ public class ManagementManager {
 	 */
 	public static ManagementManager get() {
 		if(instance == null)
-            instance = new ManagementManager();
+            instance = new ManagementManager(ActorSystem.create());
         return instance;
 	}
 	

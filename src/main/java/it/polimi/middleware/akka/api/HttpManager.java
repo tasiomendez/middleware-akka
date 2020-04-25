@@ -31,19 +31,6 @@ public class HttpManager {
 	
 	private HttpManager(ActorSystem system) { 
 		this.system = system;
-		this.initialize();
-	}
-	
-	private HttpManager() { 
-		this.system = ActorSystem.create();
-		this.initialize();
-	}
-	
-	/**
-	 * Initialize all the required parameters in order to run
-	 * the specific server.
-	 */
-	private void initialize() {
 		this.http = Http.get(this.system);
 		this.materializer = ActorMaterializer.create(this.system);
 		this.router = Router.get(this.system);
@@ -71,7 +58,7 @@ public class HttpManager {
 	 */
 	public static HttpManager get() {
 		if(instance == null)
-            instance = new HttpManager();
+            instance = new HttpManager(ActorSystem.create());
         return instance;
 	}	
 	
