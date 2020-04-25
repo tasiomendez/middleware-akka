@@ -2,6 +2,7 @@ package it.polimi.middleware.akka.api;
 
 import static akka.http.javadsl.server.PathMatchers.segment;
 
+import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -14,9 +15,11 @@ public class Router extends AllDirectives {
 	private Route[] imports = {};
 	
 	private static Router instance;
+	private ActorSystem system;
 	private LoggingAdapter log;
 	
 	private Router(ActorSystem system) {
+		this.system = system;
 		this.log = Logging.getLogger(system, this);
 	}
 	
@@ -77,6 +80,7 @@ public class Router extends AllDirectives {
 	 */
 	private Route onGetRequest() {
 		log.debug("Request received on /database/get");
+		system.actorSelection("/user/node").tell("test", ActorRef.noSender());
 		return complete("All keys");
 	}
 	
@@ -89,6 +93,7 @@ public class Router extends AllDirectives {
 	 */
 	private Route onGetRequest(String key) {
 		log.debug("Request received on /database/get/{}", key);
+		system.actorSelection("/user/node").tell("test", ActorRef.noSender());
 		return complete(key);
 	}
 	
@@ -102,6 +107,7 @@ public class Router extends AllDirectives {
 	 */
 	private Route onPutRequest(String key, String value) {
 		log.debug("Request received on /database/put/{}/{}", key, value);
+		system.actorSelection("/user/node").tell("test", ActorRef.noSender());
 		return complete(key + " " + value);
 	}
 
