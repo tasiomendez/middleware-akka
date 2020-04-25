@@ -1,23 +1,26 @@
 package it.polimi.middleware.akka.api;
 
 import akka.actor.ActorSystem;
+import akka.cluster.Cluster;
+import akka.http.javadsl.server.Route;
+import akka.management.cluster.javadsl.ClusterHttpManagementRoutes;
 import akka.management.javadsl.AkkaManagement;
 
-public class ServerManager {
+public class ManagementManager {
 	
 	private ActorSystem system;
 	private AkkaManagement management;
-	private static ServerManager instance; 
+	private static ManagementManager instance; 
 	
-	private ServerManager() { }
+	private ManagementManager() { }
 	
-	public static ServerManager getInstance() {
+	public static ManagementManager getInstance() {
 		if(instance == null)
-            instance = new ServerManager();
+            instance = new ManagementManager();
         return instance;
 	}
 	
-	public ServerManager setSystem(ActorSystem system) {
+	public ManagementManager setSystem(ActorSystem system) {
 		this.system = system;
 		this.management = AkkaManagement.get(this.system);
 		return instance;
@@ -35,6 +38,10 @@ public class ServerManager {
 	public AkkaManagement stop() {
 		this.management.stop();
 		return this.management;
+	}
+	
+	public Route exportRoutes() {
+		return ClusterHttpManagementRoutes.all(Cluster.get(this.system));
 	}
 
 }
