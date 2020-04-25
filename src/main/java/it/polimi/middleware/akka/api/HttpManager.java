@@ -17,52 +17,63 @@ import akka.stream.javadsl.Flow;
 
 public class HttpManager {
 	
-	private LoggingAdapter log;
-	
-	private ActorSystem system = ActorSystem.create();
+	private ActorSystem system;
 	private Http http;
 	private ActorMaterializer materializer;
-	private final Router router = new Router();
+	private Router router;
+	
+	private LoggingAdapter log;
 	
 	private Flow<HttpRequest, HttpResponse, NotUsed> routeFlow;
 	private CompletionStage<ServerBinding> binding; 
 	
 	private static HttpManager instance; 
 	
-	private HttpManager() { }
+	private HttpManager(ActorSystem system) { 
+		this.system = system;
+		this.initialize();
+	}
 	
-	public static HttpManager getInstance() {
-		if(instance == null)
-            instance = new HttpManager();
-        return instance;
+	private HttpManager() { 
+		this.system = ActorSystem.create();
+		this.initialize();
 	}
 	
 	/**
-	 * Mandatory before performing any operation. If it is not called,
-	 * its own ActorSystem instance is used.
+	 * Initialize all the required parameters in order to run
+	 * the specific server.
+	 */
+	private void initialize() {
+		this.http = Http.get(this.system);
+		this.materializer = ActorMaterializer.create(this.system);
+		this.router = Router.get(this.system);
+		this.log = Logging.getLogger(this.system, this);
+	}
+	
+	/**
+	 * Only one instance from this class exists. If not ActorSystem 
+	 * is provided, its own ActorSystem instance is used.
 	 * 
 	 * @param system Customized ActorSystem
 	 * @return instance
 	 */
-	public HttpManager setSystem(ActorSystem system) {
-		this.system = system;
-		this.initializeHttpManager(system);
-		this.initializeLogging(system);
-		return instance;
-	}
+	public static HttpManager get(ActorSystem system) {
+		if(instance == null)
+            instance = new HttpManager(system);
+        return instance;
+	}	
 	
-	private void initializeLogging(ActorSystem system) {
-		this.log = Logging.getLogger(system, this);
-	}
-	
-	private void initializeHttpManager(ActorSystem system) {
-		this.http = Http.get(system);
-		this.materializer = ActorMaterializer.create(system);
-	}
-	
-	public ActorSystem getSystem() {
-		return this.system;
-	}
+	/**
+	 * Only one instance from this class exists. If not ActorSystem 
+	 * is provided, its own ActorSystem instance is used.
+	 * 
+	 * @return instance
+	 */
+	public static HttpManager get() {
+		if(instance == null)
+            instance = new HttpManager();
+        return instance;
+	}	
 	
 	/**
 	 * Starts a new Akka HTTP Server which listens on the port

@@ -23,8 +23,8 @@ public class Server {
 		final ActorSystem system = ActorSystem.create(config.getString("clustering.name"), config);
 		system.actorOf(Node.props(), "Node");
 		
-		ManagementManager managementManager = ManagementManager.getInstance().setSystem(system);
-		HttpManager httpManager = HttpManager.getInstance().setSystem(system);
+		ManagementManager managementManager = ManagementManager.get(system);
+		HttpManager httpManager = HttpManager.get(system);
 		
 		if (config.getBoolean("akka.management.http.enable"))
 			httpManager.importRoutes(managementManager.exportRoutes());
