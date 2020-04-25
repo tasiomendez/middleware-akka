@@ -19,7 +19,7 @@ public class HttpManager {
 	
 	private LoggingAdapter log;
 	
-	private ActorSystem system;
+	private ActorSystem system = ActorSystem.create();
 	private Http http;
 	private ActorMaterializer materializer;
 	private final Router router = new Router();
@@ -37,6 +37,13 @@ public class HttpManager {
         return instance;
 	}
 	
+	/**
+	 * Mandatory before performing any operation. If it is not called,
+	 * its own ActorSystem instance is used.
+	 * 
+	 * @param system Customized ActorSystem
+	 * @return instance
+	 */
 	public HttpManager setSystem(ActorSystem system) {
 		this.system = system;
 		this.initializeHttpManager(system);
@@ -46,7 +53,6 @@ public class HttpManager {
 	
 	private void initializeLogging(ActorSystem system) {
 		this.log = Logging.getLogger(system, this);
-		log.debug("Logger initialized");
 	}
 	
 	private void initializeHttpManager(ActorSystem system) {
@@ -58,6 +64,12 @@ public class HttpManager {
 		return this.system;
 	}
 	
+	/**
+	 * Starts a new Akka HTTP Server which listens on the port
+	 * provided on the configuration file.
+	 * 
+	 * @return instance
+	 */
 	public HttpManager start() {
 		this.routeFlow = router.createRouter().flow(system, materializer);
 		log.debug("Routes flow created successfully");
@@ -70,11 +82,24 @@ public class HttpManager {
 		return instance;
 	}
 	
+	/**
+	 * Stops an existing Akka HTTP Server and unbinds the port 
+	 * which is used.
+	 * 
+	 * @return instance
+	 */
 	public HttpManager stop() {
 		this.binding.thenCompose(ServerBinding::unbind);
 		return instance;
 	}
 	
+	/**
+	 * Import routes from another Router into the existing router. All the
+	 * routes are combined and will be accessible
+	 * 
+	 * @param route routes to import
+	 * @return instance
+	 */
 	public HttpManager importRoutes(Route route) {
 		this.router.imports(route);
 		log.debug("Routes imported into HttpManager");
