@@ -21,7 +21,7 @@ public class Server {
 		
 
 		final ActorSystem system = ActorSystem.create(config.getString("clustering.name"), config);
-		system.actorOf(Node.props(), "Node");
+		system.actorOf(Node.props(), "node");
 		
 		ManagementManager managementManager = ManagementManager.get(system);
 		HttpManager httpManager = HttpManager.get(system);

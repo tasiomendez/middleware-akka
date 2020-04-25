@@ -8,11 +8,10 @@ import akka.cluster.Cluster;
 public class ClusterManager extends AbstractActor {
 
 	private final Cluster cluster = Cluster.get(getContext().system());
-	private final ActorRef listener = getContext().actorOf(ClusterListener.props(), "ClusterListener");
+	private final ActorRef listener = getContext().actorOf(ClusterListener.props(), "clusterListener");
 	
 	@Override
 	public Receive createReceive() {
-//		cluster.state().getMembers();
 		return receiveBuilder().build();
 	}
 	
