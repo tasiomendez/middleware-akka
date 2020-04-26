@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory;
 
 import akka.actor.ActorSystem;
 import it.polimi.middleware.akka.api.HttpManager;
-import it.polimi.middleware.akka.api.ManagementManager;
+import it.polimi.middleware.akka.api.ClusterApiManager;
 import it.polimi.middleware.akka.node.Node;
 
 public class Server {
@@ -23,11 +23,11 @@ public class Server {
 		final ActorSystem system = ActorSystem.create(config.getString("clustering.name"), config);
 		system.actorOf(Node.props(), "node");
 		
-		ManagementManager managementManager = ManagementManager.get(system);
+		ClusterApiManager clusterManager = ClusterApiManager.get(system);
 		HttpManager httpManager = HttpManager.get(system);
 		
 		if (config.getBoolean("akka.management.http.enable"))
-			httpManager.importRoutes(managementManager.exportRoutes());
+			httpManager.importRoutes(clusterManager.exportRoutes());
 		
 		httpManager.start();
 

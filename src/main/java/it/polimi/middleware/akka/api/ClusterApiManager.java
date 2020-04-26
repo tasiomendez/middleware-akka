@@ -8,16 +8,16 @@ import akka.http.javadsl.server.Route;
 import akka.management.cluster.javadsl.ClusterHttpManagementRoutes;
 import akka.management.javadsl.AkkaManagement;
 
-public class ManagementManager {
+public class ClusterApiManager {
 	
 	private ActorSystem system;
 	private AkkaManagement management;
 	
 	private LoggingAdapter log;
 	
-	private static ManagementManager instance; 
+	private static ClusterApiManager instance; 
 	
-	private ManagementManager(ActorSystem system) {
+	private ClusterApiManager(ActorSystem system) {
 		this.system = system;
 		this.management = AkkaManagement.get(this.system);
 		this.log = Logging.getLogger(this.system, this);
@@ -30,9 +30,9 @@ public class ManagementManager {
 	 * @param system Customized ActorSystem
 	 * @return instance
 	 */
-	public static ManagementManager get(ActorSystem system) {
+	public static ClusterApiManager get(ActorSystem system) {
 		if(instance == null)
-            instance = new ManagementManager(system);
+            instance = new ClusterApiManager(system);
         return instance;
 	}
 	
@@ -42,9 +42,9 @@ public class ManagementManager {
 	 * 
 	 * @return instance
 	 */
-	public static ManagementManager get() {
+	public static ClusterApiManager get() {
 		if(instance == null)
-            instance = new ManagementManager(ActorSystem.create());
+            instance = new ClusterApiManager(ActorSystem.create());
         return instance;
 	}
 	
