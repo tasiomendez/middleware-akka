@@ -18,6 +18,7 @@
 		<scala.version>2.12</scala.version>
 		<akka.version>2.5.27</akka.version>
 		<akka.management.version>1.0.6</akka.management.version>
+		<jackson.version>2.10.3</jackson.version>
 	</properties>
 
 	<dependencies>
@@ -57,5 +58,16 @@
 			<artifactId>akka-management-cluster-http_${scala.version}</artifactId>
 			<version>${akka.management.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+			<version>${jackson.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>${jackson.version}</version>
+		</dependency>
+
 	</dependencies>
 </project>
