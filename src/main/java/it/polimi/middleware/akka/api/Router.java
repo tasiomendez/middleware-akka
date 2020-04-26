@@ -6,7 +6,6 @@ import static akka.pattern.Patterns.ask;
 import java.time.Duration;
 import java.util.concurrent.CompletionStage;
 
-import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.ActorSystem;
 import akka.event.Logging;
@@ -15,7 +14,7 @@ import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.Route;
 import it.polimi.middleware.akka.messages.GetterMessage;
 import it.polimi.middleware.akka.messages.PutterMessage;
-import it.polimi.middleware.akka.messages.ReplyMessage;
+import it.polimi.middleware.akka.messages.api.ReplyMessage;
 
 public class Router extends AllDirectives {
 	
@@ -28,10 +27,12 @@ public class Router extends AllDirectives {
 	private static Router instance;
 	private ActorSystem system;
 	private LoggingAdapter log;
+	private ActorSelection gateway;
 	
 	private Router(ActorSystem system) {
 		this.system = system;
 		this.log = Logging.getLogger(system, this);
+		this.gateway = system.actorSelection("/user/node");
 	}
 	
 	public static Router get(ActorSystem system) {
@@ -92,8 +93,7 @@ public class Router extends AllDirectives {
 	private Route onGetRequest() {
 		log.debug("Request received on /database/get");
 		final GetterMessage msg = new GetterMessage();
-		system.actorSelection("/user/node").tell(msg, ActorRef.noSender());
-		return complete("All keys");
+		return routeGateway(msg);
 	}
 	
 	/**
@@ -106,9 +106,7 @@ public class Router extends AllDirectives {
 	private Route onGetRequest(String key) {
 		log.debug("Request received on /database/get/{}", key);
 		final GetterMessage msg = new GetterMessage(key);
-		final ActorSelection node = system.actorSelection("/user/node");
-		CompletionStage<ReplyMessage> future = ask(node, msg, timeout).thenApply(ReplyMessage.class::cast);
-		return completeOKWithFuture(future, Jackson.marshaller());
+		return routeGateway(msg);
 	}
 	
 	/**
@@ -122,8 +120,23 @@ public class Router extends AllDirectives {
 	private Route onPutRequest(String key, String value) {
 		log.debug("Request received on /database/put/{}/{}", key, value);
 		final PutterMessage msg = new PutterMessage(key, value);
-		system.actorSelection("/user/node").tell(msg, ActorRef.noSender());
-		return this.onGetRequest(key);
+		return routeGateway(msg);
+	}
+	
+	/**
+	 * Send a message to an actor and waits for its reply. The reply is converted
+	 * into a JSON object for the HTTP response.
+	 * 
+	 * @param msg to send
+	 * @return Route object
+	 */
+	private Route routeGateway(Object msg) {
+		final CompletionStage<Object> future = ask(this.gateway, msg, timeout)
+				.thenApplyAsync(message -> {
+					log.debug("Reply received from {}", this.gateway.pathString());
+					return message;
+				}, this.system.dispatcher());
+		return completeOKWithFuture(future, Jackson.marshaller());
 	}
 
 }
