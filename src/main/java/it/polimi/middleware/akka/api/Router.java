@@ -15,6 +15,7 @@ import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.Route;
 import it.polimi.middleware.akka.messages.GetterMessage;
 import it.polimi.middleware.akka.messages.PutterMessage;
+import it.polimi.middleware.akka.messages.ReplyMessage;
 
 public class Router extends AllDirectives {
 	
@@ -106,8 +107,8 @@ public class Router extends AllDirectives {
 		log.debug("Request received on /database/get/{}", key);
 		final GetterMessage msg = new GetterMessage(key);
 		final ActorSelection node = system.actorSelection("/user/node");
-		CompletionStage<String> future = ask(node, msg, timeout).thenApply(msgg -> msgg.toString());
-		return completeOKWithFutureString(future);
+		CompletionStage<ReplyMessage> future = ask(node, msg, timeout).thenApply(ReplyMessage.class::cast);
+		return completeOKWithFuture(future, Jackson.marshaller());
 	}
 	
 	/**
