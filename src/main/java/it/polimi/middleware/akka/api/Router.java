@@ -1,18 +1,28 @@
 package it.polimi.middleware.akka.api;
 
 import static akka.http.javadsl.server.PathMatchers.segment;
+import static akka.pattern.Patterns.ask;
+
+import java.time.Duration;
+import java.util.concurrent.CompletionStage;
 
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
 import akka.actor.ActorSystem;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.Route;
+import it.polimi.middleware.akka.messages.GetterMessage;
+import it.polimi.middleware.akka.messages.PutterMessage;
 
 public class Router extends AllDirectives {
 	
 	// Initialize by default in case there are no imports
 	private Route[] imports = {};
+	
+	// Timeout for discarding a request
+	private static final Duration timeout = Duration.ofSeconds(5);
 	
 	private static Router instance;
 	private ActorSystem system;
@@ -80,7 +90,8 @@ public class Router extends AllDirectives {
 	 */
 	private Route onGetRequest() {
 		log.debug("Request received on /database/get");
-		system.actorSelection("/user/node").tell("test", ActorRef.noSender());
+		final GetterMessage msg = new GetterMessage();
+		system.actorSelection("/user/node").tell(msg, ActorRef.noSender());
 		return complete("All keys");
 	}
 	
@@ -93,8 +104,10 @@ public class Router extends AllDirectives {
 	 */
 	private Route onGetRequest(String key) {
 		log.debug("Request received on /database/get/{}", key);
-		system.actorSelection("/user/node").tell("test", ActorRef.noSender());
-		return complete(key);
+		final GetterMessage msg = new GetterMessage(key);
+		final ActorSelection node = system.actorSelection("/user/node");
+		CompletionStage<String> future = ask(node, msg, timeout).thenApply(msgg -> msgg.toString());
+		return completeOKWithFutureString(future);
 	}
 	
 	/**
@@ -107,8 +120,9 @@ public class Router extends AllDirectives {
 	 */
 	private Route onPutRequest(String key, String value) {
 		log.debug("Request received on /database/put/{}/{}", key, value);
-		system.actorSelection("/user/node").tell("test", ActorRef.noSender());
-		return complete(key + " " + value);
+		final PutterMessage msg = new PutterMessage(key, value);
+		system.actorSelection("/user/node").tell(msg, ActorRef.noSender());
+		return this.onGetRequest(key);
 	}
 
 }
