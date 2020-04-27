@@ -7,8 +7,11 @@ import akka.actor.Props;
 import akka.cluster.Cluster;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.http.javadsl.model.StatusCodes;
 import it.polimi.middleware.akka.messages.GetterMessage;
 import it.polimi.middleware.akka.messages.PutterMessage;
+import it.polimi.middleware.akka.messages.api.ErrorMessage;
+import it.polimi.middleware.akka.messages.api.ReplyMessage;
 import it.polimi.middleware.akka.messages.api.SuccessMessage;
 
 public class Storage extends AbstractActor {
@@ -31,7 +34,10 @@ public class Storage extends AbstractActor {
 		log.debug("Get request received for key: {}", msg.getKey());
 		final String address = cluster.selfMember().address().toString();
 		final String value = this.storage.get(msg.getKey());
-		final SuccessMessage reply = new SuccessMessage(msg.getKey(), value, address);
+		ReplyMessage reply;
+		if (storage.containsKey(msg.getKey()))
+			reply = new SuccessMessage(msg.getKey(), value, address);
+		else reply = new ErrorMessage(StatusCodes.NOT_FOUND);
 		sender().tell(reply, self());
 	}
 	
