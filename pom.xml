@@ -21,6 +21,41 @@
 		<jackson.version>2.10.3</jackson.version>
 	</properties>
 
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.2.1</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<artifactSet>
+								<includes>
+									<include>*:*</include>
+								</includes>
+							</artifactSet>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+									<resource>reference.conf</resource>
+								</transformer>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<manifestEntries>
+										<Main-Class>it.polimi.middleware.akka.Server</Main-Class>
+									</manifestEntries>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
@@ -68,6 +103,6 @@
 			<artifactId>jackson-databind</artifactId>
 			<version>${jackson.version}</version>
 		</dependency>
-
 	</dependencies>
+
 </project>
