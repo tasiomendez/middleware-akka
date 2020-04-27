@@ -1,0 +1,50 @@
+version: '3'
+services:
+  seed:
+    build: .
+    image: middleware/akka:latest
+    hostname: seed
+    environment:
+      - AKKA_CLUSTER_IP=seed
+      - AKKA_CLUSTER_PORT=2552
+      - AKKA_CLUSTER_SEED_IP=seed
+      - AKKA_CLUSTER_SEED_PORT=2552
+      - AKKA_SERVER_PORT=8080
+    ports:
+      - 8080:8080
+    networks:
+      - cluster
+
+  node1:
+    build: .
+    image: middleware/akka:latest
+    hostname: node1
+    environment:
+      - AKKA_CLUSTER_IP=node1
+      - AKKA_CLUSTER_PORT=2555
+      - AKKA_CLUSTER_SEED_IP=seed
+      - AKKA_CLUSTER_SEED_PORT=2552
+      - AKKA_SERVER_PORT=8081
+    ports:
+      - 8081:8081
+    networks:
+      - cluster
+
+  node2:
+    build: .
+    image: middleware/akka:latest
+    hostname: node2
+    environment:
+      - AKKA_CLUSTER_IP=node2
+      - AKKA_CLUSTER_PORT=2555
+      - AKKA_CLUSTER_SEED_IP=seed
+      - AKKA_CLUSTER_SEED_PORT=2552
+      - AKKA_SERVER_PORT=8082
+    ports:
+      - 8082:8082
+    networks:
+      - cluster
+
+networks:
+  cluster:
+    driver: bridge
