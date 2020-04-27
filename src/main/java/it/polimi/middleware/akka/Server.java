@@ -11,20 +11,18 @@ import it.polimi.middleware.akka.node.Node;
 public class Server {
 
 	public static void main(String[] args) {
-		
+
 		Config config = ConfigFactory.load();	
 
 		final ActorSystem system = ActorSystem.create(config.getString("clustering.name"), config);
 		system.actorOf(Node.props(), "node");
-		
+
 		ClusterApiManager clusterManager = ClusterApiManager.get(system);
 		HttpManager httpManager = HttpManager.get(system);
-		
+
 		if (config.getBoolean("akka.management.http.enable"))
 			httpManager.importRoutes(clusterManager.exportRoutes());
-		
+
 		httpManager.start();
-
 	}
-
 }
