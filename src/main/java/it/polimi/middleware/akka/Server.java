@@ -4,21 +4,15 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
 import akka.actor.ActorSystem;
-import it.polimi.middleware.akka.api.HttpManager;
 import it.polimi.middleware.akka.api.ClusterApiManager;
+import it.polimi.middleware.akka.api.HttpManager;
 import it.polimi.middleware.akka.node.Node;
 
 public class Server {
 
 	public static void main(String[] args) {
 		
-		Config config = ConfigFactory.load();
-
-		// Override the configuration of the port
-//		final Config config = ConfigFactory //
-//				.parseFile(new File("resources/application.conf")) //
-//				.withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef("9000"));
-		
+		Config config = ConfigFactory.load();	
 
 		final ActorSystem system = ActorSystem.create(config.getString("clustering.name"), config);
 		system.actorOf(Node.props(), "node");
@@ -32,4 +26,5 @@ public class Server {
 		httpManager.start();
 
 	}
+
 }
