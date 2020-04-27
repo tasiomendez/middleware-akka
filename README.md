@@ -30,3 +30,41 @@ The Akka Management API provides several routes in order to test the state of th
 | `/cluster/members/:address` | GET | Returns the status of `:address` in the Cluster in JSON format. |
 | `/cluster/shards/:name` | GET | Returns shard info for the shard region with the provided `:name`. |
 
+## Deployment
+
+The deployment is made using [Docker](https://docs.docker.com/engine/docker-overview/) and
+[Docker Compose](https://docs.docker.com/compose/). It is based on minimum two containers: the
+first one is the seed, the node of the cluster where other nodes should join automatically at startup.
+
+```shell
+docker-compose up
+```
+
+If some changes are made in the code, it is needed to rebuild the image. It could be done
+at the same time as the deployment by using the following command.
+
+```shell
+docker-compose up --build
+```
+
+If the user wants to build the image without running it, the following command can be used.
+
+```shell
+docker build -t middleware/akka .
+```
+
+## Environment variables
+
+Some environment variables are provided to have a minimum configuration for the service.
+
+| Variable | Default value | Purpose |
+| -------- | ------------- | ------- |
+| `AKKA_LOG_LEVEL`         | INFO          | Log level used by the configured loggers. |
+| `AKKA_CLUSTER_IP`        | 127.0.0.1     | The ip where the cluster is running. It is the address where other nodes should connect. |
+| `AKKA_CLUSTER_NAME`      | ClusterSystem | The name of the cluster. It must be the same for all the nodes that belongs to the same cluster. |
+| `AKKA_CLUSTER_PORT`      | 2552          | The port where the cluster is listening. It is the port where other nodes should connect to. |
+| `AKKA_CLUSTER_ROLE`      | ""            | The role of this node in the cluster. |
+| `AKKA_CLUSTER_SEED_IP`   | 127.0.0.1     | The ip of the node to join automatically at startup. |
+| `AKKA_CLUSTER_SEED_PORT` | 2552          | The port of the node to join automatically at startup. |
+| `AKKA_SERVER_PORT`       | 8080          | The port where the http server listens to. |
+| `AKKA_SERVER_MANAGEMENT` | true          |Enable the api management of the cluster.  |
