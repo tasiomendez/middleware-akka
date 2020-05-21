@@ -2,24 +2,26 @@ package it.polimi.middleware.akka.messages;
 
 import java.io.Serializable;
 
+import it.polimi.middleware.akka.node.NodeType;
+
 public class FindSuccessorRequestMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final int id;
+    private final NodeType sender;
 
-    public FindSuccessorRequestMessage(int id) {
-        this.id = id;
+    public FindSuccessorRequestMessage(NodeType sender) {
+        this.sender = sender;
     }
 
-    public int getId() {
-        return id;
+    public NodeType getSender() {
+        return sender;
     }
 
     @Override
     public String toString() {
         return "FindSuccessorRequestMessage [" +
-                "id=" + id +
+                "node=" + sender +
                 ']';
     }
 }

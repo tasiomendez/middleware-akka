@@ -2,17 +2,19 @@ package it.polimi.middleware.akka.messages.heartbeat;
 
 import java.io.Serializable;
 
+import it.polimi.middleware.akka.node.NodeType;
+
 public class NotifyMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final int id;
+    private final NodeType sender;
 
-    public NotifyMessage(int id) {
-        this.id = id;
+    public NotifyMessage(NodeType sender) {
+        this.sender = sender;
     }
 
-    public int getId() {
-        return id;
+    public NodeType getSender() {
+        return sender;
     }
 }

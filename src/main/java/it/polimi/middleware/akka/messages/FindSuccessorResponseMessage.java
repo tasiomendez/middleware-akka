@@ -1,26 +1,20 @@
 package it.polimi.middleware.akka.messages;
 
-import akka.actor.ActorRef;
+import it.polimi.middleware.akka.node.NodeType;
 import scala.Serializable;
 
 public class FindSuccessorResponseMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final ActorRef successor;
-    private final int successorId;
+    private final NodeType successor;
 
-    public FindSuccessorResponseMessage(ActorRef successor, int successorId) {
+    public FindSuccessorResponseMessage(NodeType successor) {
         this.successor = successor;
-        this.successorId = successorId;
     }
 
-    public ActorRef getSuccessor() {
+    public NodeType getSuccessor() {
         return successor;
-    }
-
-    public int getSuccessorId() {
-        return successorId;
     }
 
     @Override

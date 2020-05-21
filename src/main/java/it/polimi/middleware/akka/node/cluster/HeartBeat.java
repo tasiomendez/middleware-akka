@@ -1,0 +1,64 @@
+package it.polimi.middleware.akka.node.cluster;
+
+import java.time.Duration;
+
+import akka.actor.ActorSystem;
+import akka.event.Logging;
+import akka.event.LoggingAdapter;
+
+public class HeartBeat {
+	
+	private static final Duration INITIAL_DELAY = Duration.ofSeconds(4);
+	private static final Duration BETWEEN_DELAY = Duration.ofSeconds(4);
+	
+	private final ActorSystem system;
+	private final LoggingAdapter log;
+
+	private static HeartBeat instance; 
+	
+	private HeartBeat(ActorSystem system) { 
+		this.system = system;
+		this.log = Logging.getLogger(this.system, this);
+	}
+	
+	/**
+	 * Only one instance from this class exists. If not ActorSystem 
+	 * is provided, its own ActorSystem instance is used.
+	 * 
+	 * @param system Customized ActorSystem
+	 * @return instance
+	 */
+	public static HeartBeat get(ActorSystem system) {
+		if(instance == null)
+            instance = new HeartBeat(system);
+        return instance;
+	}	
+	
+	/**
+	 * Only one instance from this class exists. If not ActorSystem 
+	 * is provided, its own ActorSystem instance is used.
+	 * 
+	 * @return instance
+	 */
+	public static HeartBeat get() {
+		if(instance == null)
+            instance = new HeartBeat(ActorSystem.create());
+        return instance;
+	}
+	
+	/**
+	 * Start heartbeat messaging. The function passed as parameter is
+	 * executed every X seconds.
+	 * 
+	 * @param runnable
+	 */
+	public void start(Runnable runnable) {
+		log.debug("Starting heartbeat");
+        this.system.scheduler().schedule(
+                INITIAL_DELAY, // initial delay
+                BETWEEN_DELAY, // delay between each invocation
+                runnable,
+                this.system.dispatcher());
+	}
+	
+}
