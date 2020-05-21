@@ -35,6 +35,7 @@ public class ClusterListener extends AbstractActor {
 
     private void onUnreachableMember(UnreachableMember msg) {
         log.info("Node {} - Member detected as Unreachable: {}", msg.member().address(), msg.member());
+        getContext().getParent().tell(msg, getContext().getParent());
     }
 
     private void onMemberRemoved(MemberRemoved msg) {

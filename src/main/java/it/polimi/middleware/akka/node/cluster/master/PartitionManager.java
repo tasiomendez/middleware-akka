@@ -8,6 +8,7 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.cluster.Cluster;
+import akka.cluster.ClusterEvent.UnreachableMember;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
@@ -24,32 +25,42 @@ public class PartitionManager extends AbstractActor {
     private final Cluster cluster = Cluster.get(getContext().getSystem());
 
     private final AtomicInteger counter = new AtomicInteger(0);
-    private final TreeMap<Integer, ActorRef> members = new TreeMap<>();
+    
+    // The key for the TreeMap is the hash of the address of the node
+    // in order to be able to search when node is marked as unreachable
+    private final TreeMap<Integer, NodeDef> members = new TreeMap<>();
     
     public PartitionManager() {
     	// Create ring at beginning
 		getContext().getParent().tell(new CreateRingMessage(counter.get()), self());
-		members.put(counter.get(), getContext().getParent());
+		final NodeDef node = new NodeDef(counter.get(), getContext().getParent());
+		members.put(getContext().self().path().address().hashCode(), node);
 	}
 
     private void onIdRequest(IdRequestMessage msg) {
         final int id = counter.incrementAndGet();
-        log.info("Received id request from {}, assigning id {}", sender().path(), id);
+        log.info("Received id request from {}, assigning id {}", sender().path().address(), id);
 
-        Map.Entry<Integer, ActorRef> entry = members.lastEntry();
+        Map.Entry<Integer, NodeDef> entry = members.lastEntry();
         
-        log.debug("Assigning successor with id {}, path {}", entry.getKey(), entry.getValue().path());
+        log.debug("Assigning successor with id {}, path {}", entry.getKey(), entry.getValue().getActor().path());
+        sender().tell(new IdResponseMessage(id, entry.getValue()), self());
         
-        NodeDef successor = new NodeDef(entry.getKey(), entry.getValue());
-        sender().tell(new IdResponseMessage(id, successor), self());
-        
-        members.put(id, sender());
+        final NodeDef node = new NodeDef(id, sender());
+        this.members.put(msg.getMember().address().hashCode(), node);
+    }
+    
+    private void onUnreachableMember(UnreachableMember msg) {
+    	cluster.down(msg.member().address());
+    	log.info("Member {} marked as down", msg.member().address());
+    	this.members.remove(msg.member().address().hashCode());
     }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder()
                 .match(IdRequestMessage.class, this::onIdRequest)
+                .match(UnreachableMember.class, this::onUnreachableMember)
                 .build();
     }
 

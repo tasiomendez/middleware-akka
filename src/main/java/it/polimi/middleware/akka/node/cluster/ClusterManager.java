@@ -4,6 +4,7 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.cluster.Cluster;
+import akka.cluster.ClusterEvent.UnreachableMember;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
@@ -48,7 +49,7 @@ public class ClusterManager extends AbstractActor {
 		if (this.successor.isNull()) {
 			log.debug("Successor not set yet");
 			return;
-		}
+		} 
 		this.successor.getActor().tell(new GetPredecessorRequestMessage(), self());
 		log.debug("Ring set as {} - {} - {}", this.predecessor, this.self, this.successor);
 	}
@@ -62,7 +63,7 @@ public class ClusterManager extends AbstractActor {
 
 	private void onIdResponse(IdResponseMessage msg) {
 		this.self = new NodeDef(msg.getId(), self());
-		log.info("Set id to [{}], entry node is [{}]", this.self, msg.getSuccessor().getActor().path());
+		log.info("Set id to [{}], entry node is [{}]", this.self, msg.getSuccessor().getActor().path().address());
 		msg.getSuccessor().getActor().tell(new FindSuccessorRequestMessage(this.self), self());
 		this.heartbeat.start(this::heartbeat);
 	}
@@ -85,7 +86,7 @@ public class ClusterManager extends AbstractActor {
 	private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
 		this.successor = msg.getSuccessor();
 		log.debug("Successor found as {}", this.successor);
-		log.info("Successor updated to {}", this.successor.getActor().path());
+		log.info("Successor updated to {}", this.successor.getActor().path().address());
 	}
 
 	/**
@@ -113,7 +114,7 @@ public class ClusterManager extends AbstractActor {
 				isBetween(successorPredecessorId, this.self.getId(), this.successor.getId(), false, false)) {
 			log.debug("Successor updated: [{}] -> [{}]", this.successor.getId(), successorPredecessorId);
 			this.successor = new NodeDef(msg.getPredecessor().getId(), msg.getPredecessor().getActor());
-			log.info("Successor updated to {}", this.successor.getActor().path());
+			log.info("Successor updated to {}", this.successor.getActor().path().address());
 		}
 		// notify the successor of the presence of this node
 		log.debug("Sending notification to successor {}", this.successor);
@@ -132,8 +133,20 @@ public class ClusterManager extends AbstractActor {
 			log.debug("Predecessor updated: [{}] -> [{}]", 
 					this.predecessor.getId() == -1 ? "null" : this.predecessor.getId(), msg.getSender().getId());
 			this.predecessor = new NodeDef(msg.getSender().getId(), sender());
-			log.info("Predecessor updated to {}", this.predecessor.getActor().path());
+			log.info("Predecessor updated to {}", this.predecessor.getActor().path().address());
 		}
+	}
+	
+	private void onUnreachableMember(UnreachableMember msg) {
+		if (cluster.selfMember().hasRole("master"))
+			master.forward(msg, getContext());
+		
+		if (this.successor.getActor().path().address().equals(msg.member().address()))
+			this.successor = new NodeDef(this.predecessor.getId(), this.predecessor.getActor());
+			
+		if (this.predecessor.getActor().path().address().equals(msg.member().address()))
+			this.predecessor = new NodeDef(-1, null);
+			
 	}
 
 	@Override
@@ -153,6 +166,8 @@ public class ClusterManager extends AbstractActor {
 
 				// HeartBeat messages - Notifications
 				.match(NotifyMessage.class, this::onNotify)
+				
+				.match(UnreachableMember.class, this::onUnreachableMember)
 
 				.matchAny(msg -> log.warning("Received unknown message: {}", msg))
 				.build();
