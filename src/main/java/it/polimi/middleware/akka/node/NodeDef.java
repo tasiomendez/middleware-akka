@@ -4,14 +4,14 @@ import java.io.Serializable;
 
 import akka.actor.ActorRef;
 
-public class NodeType implements Serializable {
+public class NodeDef implements Serializable {
 	
 	private static final long serialVersionUID = 1L;
 	
 	private int id;
 	private ActorRef actor;
 	
-	public NodeType(int id, ActorRef actor) {
+	public NodeDef(int id, ActorRef actor) {
 		this.id = id;
 		this.actor = actor;
 	}
@@ -48,7 +48,7 @@ public class NodeType implements Serializable {
 
 	@Override
 	public boolean equals(Object obj) {
-		NodeType other = (NodeType) obj;
+		NodeDef other = (NodeDef) obj;
 		return other.id == this.id && this.actor.equals(other.actor);
 	}
 	

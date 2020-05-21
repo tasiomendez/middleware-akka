@@ -13,7 +13,7 @@ import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
 import it.polimi.middleware.akka.messages.IdRequestMessage;
 import it.polimi.middleware.akka.messages.IdResponseMessage;
-import it.polimi.middleware.akka.node.Successor;
+import it.polimi.middleware.akka.node.NodeDef;
 
 public class PartitionManager extends AbstractActor {
 
@@ -40,7 +40,7 @@ public class PartitionManager extends AbstractActor {
         
         log.debug("Assigning successor with id {}, path {}", entry.getKey(), entry.getValue().path());
         
-        Successor successor = new Successor(entry.getKey(), entry.getValue());
+        NodeDef successor = new NodeDef(entry.getKey(), entry.getValue());
         sender().tell(new IdResponseMessage(id, successor), self());
         
         members.put(id, sender());

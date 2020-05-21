@@ -1,6 +1,6 @@
 package it.polimi.middleware.akka.messages;
 
-import it.polimi.middleware.akka.node.Successor;
+import it.polimi.middleware.akka.node.NodeDef;
 import scala.Serializable;
 
 public class IdResponseMessage implements Serializable {
@@ -8,9 +8,9 @@ public class IdResponseMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final int id;
-    private final Successor successor;
+    private final NodeDef successor;
 
-    public IdResponseMessage(int id, Successor successor) {
+    public IdResponseMessage(int id, NodeDef successor) {
         this.id = id;
         this.successor = successor;
     }
@@ -19,7 +19,7 @@ public class IdResponseMessage implements Serializable {
         return id;
     }
 
-    public Successor getSuccessor() {
+    public NodeDef getSuccessor() {
         return successor;
     }
     
