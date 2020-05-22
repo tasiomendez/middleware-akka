@@ -16,6 +16,8 @@ import it.polimi.middleware.akka.messages.join.FindSuccessorResponseMessage;
 import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.NodeID;
@@ -29,9 +31,6 @@ import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
  * It supervises the {@link ClusterListener} and in the master node it will supervises the {@link PartitionManager}.
  */
 public class ClusterManager extends AbstractActor {
-
-	private static final int PARTITION_NUMBER = (int) Math.pow(2, 32);
-	private static final int REPLICATION_NUMBER = 2;
 
 	private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 	private final Cluster cluster = Cluster.get(getContext().system());
@@ -100,6 +99,7 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg master notification message
 	 */
 	private void onMasterNotification(MasterNotificationMessage msg) {
+		log.debug("Master found at {}", msg.getMaster().path());
 		this.master = msg.getMaster();
 		this.master.tell(new IdRequestMessage(cluster.selfMember()), self());
 	}
@@ -256,6 +256,11 @@ public class ClusterManager extends AbstractActor {
 						() -> cluster.selfMember().hasRole("master"), 
 						(msg) -> partitionManager.forward(msg, getContext()))
 				.match(NewSuccessorResponseMessage.class, this::onNewSuccessorResponse)
+				
+				// Storage messages
+				.match(GetPartitionRequestMessage.class, 
+						() -> cluster.selfMember().hasRole("master"), 
+						(msg) -> partitionManager.forward(msg, getContext()))
 
 				.matchAny(msg -> log.warning("Received unknown message: {}", msg))
 				.build();

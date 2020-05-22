@@ -9,6 +9,8 @@ import akka.http.javadsl.model.StatusCodes;
 
 public class SuccessMessage extends ReplyMessage {
 	
+	private static final long serialVersionUID = 1L;
+	
 	@JsonInclude(Include.NON_EMPTY)
 	private HashMap<String, String> storage;
 	

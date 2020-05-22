@@ -1,8 +1,12 @@
 package it.polimi.middleware.akka.messages.api;
 
+import java.io.Serializable;
+
 import akka.http.javadsl.model.StatusCode;
 
-public class ReplyMessage {
+public class ReplyMessage implements Serializable {
+	
+	private static final long serialVersionUID = 1L;
 	
 	private StatusCode code;
 	private String message;

@@ -13,6 +13,8 @@ import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
 import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.NodeID;
@@ -31,15 +33,19 @@ public class PartitionManager extends AbstractActor {
 
     private final AtomicInteger counter = new AtomicInteger(0);
     
-    // The key for the TreeMap is the hash of the address of the node
-    // in order to be able to search when node is marked as unreachable
+    // The members tree stores id and actors, while the ids tree 
+    // associates each address to an id.
     private final TreeMap<Integer, NodeID> members = new TreeMap<>();
+    private final TreeMap<Integer, Integer> ids = new TreeMap<>();
     
     public PartitionManager() {
     	// Create ring at beginning
 		getContext().getParent().tell(new CreateRingMessage(counter.get()), self());
+		
+		// Actor stored references ClusterManager
 		final NodeID node = new NodeID(counter.get(), getContext().getParent());
-		members.put(getContext().self().path().address().hashCode(), node);
+		this.members.put(node.getId(), node);
+		this.ids.put(getContext().self().path().address().hashCode(), node.getId());
 	}
 
     private void onIdRequest(IdRequestMessage msg) {
@@ -50,19 +56,29 @@ public class PartitionManager extends AbstractActor {
         log.debug("Assigning successor with id {}, path {}", entry.getId(), entry.getActor().path());
         sender().tell(new IdResponseMessage(id, entry), self());
         
+        // Actor stored references ClusterManager
         final NodeID node = new NodeID(id, sender());
-        this.members.put(msg.getMember().address().hashCode(), node);
+        this.members.put(node.getId(), node);
+        this.ids.put(msg.getMember().address().hashCode(), node.getId());
     }
     
     private void onUnreachableMember(UnreachableMember msg) {
     	cluster.down(msg.member().address());
     	log.info("Member {} marked as down", msg.member().address());
-    	this.members.remove(msg.member().address().hashCode());
+    	final int id = this.ids.remove(msg.member().address().hashCode());
+    	this.members.remove(id);
     }
     
-    private void onNewSuccessorRequestMessage(NewSuccessorRequestMessage msg) {
+    private void onNewSuccessorRequest(NewSuccessorRequestMessage msg) {
     	final NodeID entry = getRandomMember();
     	sender().tell(new NewSuccessorResponseMessage(entry), self());
+    }
+    
+    private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
+    	final int key = msg.getEntry().getKey().hashCode() % PARTITION_NUMBER;
+    	final NodeID partition = members.lowerEntry(key).getValue();
+    	log.debug("Partition for key [{}] is [{}]", msg.getEntry().getKey(), partition.getActor().path());
+    	partition.getActor().tell(new GetPartitionResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
     }
     
     /**
@@ -83,7 +99,11 @@ public class PartitionManager extends AbstractActor {
                 .match(IdRequestMessage.class,  this::onIdRequest)
                 .match(UnreachableMember.class, this::onUnreachableMember)
                 
-                .match(NewSuccessorRequestMessage.class, this::onNewSuccessorRequestMessage)
+                .match(NewSuccessorRequestMessage.class, this::onNewSuccessorRequest)
+                
+                .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)
+
+				.matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();
     }
 
