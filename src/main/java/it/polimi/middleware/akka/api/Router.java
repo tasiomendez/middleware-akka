@@ -12,8 +12,8 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.Route;
-import it.polimi.middleware.akka.messages.GetterMessage;
-import it.polimi.middleware.akka.messages.PutterMessage;
+import it.polimi.middleware.akka.messages.storage.GetterMessage;
+import it.polimi.middleware.akka.messages.storage.PutterMessage;
 
 public class Router extends AllDirectives {
 	

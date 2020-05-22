@@ -1,4 +1,4 @@
-package it.polimi.middleware.akka.messages;
+package it.polimi.middleware.akka.messages.join;
 
 import java.io.Serializable;
 

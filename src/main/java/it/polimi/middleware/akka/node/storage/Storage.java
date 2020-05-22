@@ -8,11 +8,11 @@ import akka.cluster.Cluster;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.http.javadsl.model.StatusCodes;
-import it.polimi.middleware.akka.messages.GetterMessage;
-import it.polimi.middleware.akka.messages.PutterMessage;
 import it.polimi.middleware.akka.messages.api.ErrorMessage;
 import it.polimi.middleware.akka.messages.api.ReplyMessage;
 import it.polimi.middleware.akka.messages.api.SuccessMessage;
+import it.polimi.middleware.akka.messages.storage.GetterMessage;
+import it.polimi.middleware.akka.messages.storage.PutterMessage;
 
 public class Storage extends AbstractActor {
 

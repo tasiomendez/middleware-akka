@@ -2,19 +2,19 @@ package it.polimi.middleware.akka.messages.heartbeat;
 
 import java.io.Serializable;
 
-import it.polimi.middleware.akka.node.NodeDef;
+import it.polimi.middleware.akka.node.NodeID;
 
 public class GetPredecessorResponseMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final NodeDef predecessor;
+    private final NodeID predecessor;
 
-    public GetPredecessorResponseMessage(NodeDef predecessor) {
+    public GetPredecessorResponseMessage(NodeID predecessor) {
         this.predecessor = predecessor;
     }
 
-    public NodeDef getPredecessor() {
+    public NodeID getPredecessor() {
         return predecessor;
     }
 }
