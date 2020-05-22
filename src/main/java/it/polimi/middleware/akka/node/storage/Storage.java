@@ -95,6 +95,7 @@ public class Storage {
 	
 	/**
 	 * Get all keys and values stored in the current node.
+	 * 
 	 * @return reply message
 	 */
 	public ReplyMessage getAll() {
@@ -108,6 +109,7 @@ public class Storage {
 	
 	/**
 	 * Add a new partition to the backup from an existing node.
+	 * 
 	 * @param address address of the backup node
 	 * @param storage storage to backup
 	 * @return data stored
@@ -119,6 +121,7 @@ public class Storage {
 	
 	/**
 	 * Get an existing partition from the backup of an existing node.
+	 * 
 	 * @param address address of the backup node
 	 * @return data 
 	 */
@@ -129,6 +132,7 @@ public class Storage {
 	
 	/**
 	 * Remove an existing partition from the backup of an existing node.
+	 * 
 	 * @param address address of the backup node
 	 * @return data removed
 	 */
@@ -139,6 +143,7 @@ public class Storage {
 	
 	/**
 	 * Restore a backup of a giving node into current node.
+	 * 
 	 * @param address
 	 * @return the restored data
 	 */

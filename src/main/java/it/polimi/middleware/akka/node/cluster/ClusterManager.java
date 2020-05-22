@@ -84,6 +84,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handles an incoming {@link CreateRingMessage}. Create the ring at the beginning. 
 	 * This action is performed by the master node.
+	 * 
 	 * @param msg create ring message.
 	 */
 	private void onCreateRing(CreateRingMessage msg) {
@@ -96,6 +97,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handles an incoming {@link MasterNotificationMessage} Get a notification of 
 	 * the master node at the beginning in order to keep its actor reference.
+	 * 
 	 * @param msg master notification message
 	 */
 	private void onMasterNotification(MasterNotificationMessage msg) {
@@ -107,6 +109,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handle an incoming {@link IdResponseMessage} by setting the id of the
 	 * self node and by starting a search of its successor.
+	 * 
 	 * @param msg id response message
 	 */
 	private void onIdResponse(IdResponseMessage msg) {
@@ -121,6 +124,7 @@ public class ClusterManager extends AbstractActor {
 	 * has an ID which is between my id and my successor id, then the successor of the sender
 	 * is my successor and replies with {@link FindSuccessorResponseMessage}.
 	 * If not, then forward the message to my successor in order to continue the search.
+	 * 
 	 * @param msg find successor request message
 	 */
 	private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
@@ -141,6 +145,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handles an incoming {@link FindSuccessorResponseMessage} that occurs when the successor
 	 * has been found. Then, the successor reference is updated.
+	 * 
 	 * @param msg
 	 */
 	private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
@@ -151,6 +156,7 @@ public class ClusterManager extends AbstractActor {
 
 	/**
 	 * Respond to a {@link GetPredecessorRequestMessage} by sending the reference to the node's predecessor.
+	 * 
 	 * @param msg predecessor request message
 	 */
 	private void onGetPredecessorRequest(GetPredecessorRequestMessage msg) {
@@ -201,6 +207,7 @@ public class ClusterManager extends AbstractActor {
 	 * is my successor or predecessor, a new search needs to be performed.
 	 * The master node will forward the message to the {@link PartitionManager} in order
 	 * to mark it as down.
+	 * 
 	 * @param msg unreachable member
 	 */
 	private void onUnreachableMember(UnreachableMember msg) {
@@ -222,6 +229,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handles a {@link NewSuccessorRequestMessage} when a new successor reference is 
 	 * required to the master node.
+	 * 
 	 * @param msg new successor response message.
 	 */
 	private void onNewSuccessorResponse(NewSuccessorResponseMessage msg) {
