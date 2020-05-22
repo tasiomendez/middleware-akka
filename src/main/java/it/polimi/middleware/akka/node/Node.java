@@ -13,6 +13,10 @@ import it.polimi.middleware.akka.messages.storage.PutterMessage;
 import it.polimi.middleware.akka.node.cluster.ClusterManager;
 import it.polimi.middleware.akka.node.storage.Storage;
 
+/**
+ * Main supervisor of node actors. It is the main entry point to the node.
+ * It supervises the {@link ClusterManager} actor and the {@link Storage} actor.
+ */
 public class Node extends AbstractActor {
 
 	private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);

@@ -17,6 +17,10 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.NodeID;
 
+/**
+ * The PartitionManager actor belongs to the master node. It is in charge of keeping track of 
+ * the members in the cluster and their ids. It will provide new unique ids when needed.
+ */
 public class PartitionManager extends AbstractActor {
 
     private static final int PARTITION_NUMBER = (int) Math.pow(2, 32);
@@ -61,6 +65,11 @@ public class PartitionManager extends AbstractActor {
     	sender().tell(new NewSuccessorResponseMessage(entry), self());
     }
     
+    /**
+     * Get random member from the TreeMap. 
+     * 
+     * @return the member
+     */
     private NodeID getRandomMember() {
     	// Get random member
         final Object[] entries = this.members.values().toArray();

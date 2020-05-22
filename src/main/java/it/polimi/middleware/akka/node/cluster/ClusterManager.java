@@ -21,6 +21,13 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.NodeID;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
 
+/**
+ * The ClusterManager actor is in charge of managing the cluster taking into account if a new node
+ * is joined, if a node is removed from the cluster and all the changes within it. It is the one in 
+ * charge of managing the stability between the nodes.
+ * 
+ * It supervises the {@link ClusterListener} and in the master node it will supervises the {@link PartitionManager}.
+ */
 public class ClusterManager extends AbstractActor {
 
 	private static final int PARTITION_NUMBER = (int) Math.pow(2, 32);
@@ -46,12 +53,26 @@ public class ClusterManager extends AbstractActor {
 				getContext().actorOf(PartitionManager.props(), "partitionManager") : null;
 	}
 
+	/**
+	 * Check if the id passed as parameter is between the bounds.
+	 * 
+	 * @param id
+	 * @param lowerBound lower limit
+	 * @param upperBound upper limit
+	 * @param inclusiveLower include lower limit if true
+	 * @param inclusiveUpper include upper limit if true
+	 * @return true if is between, false otherwise
+	 */
 	private static boolean isBetween(int id, int lowerBound, int upperBound, boolean inclusiveLower, boolean inclusiveUpper) {
 		boolean checkLower = inclusiveLower ? id >= lowerBound : id > lowerBound;
 		boolean checkUpper = inclusiveUpper ? id <= upperBound : id < upperBound;
 		return (checkLower && checkUpper) || (upperBound <= lowerBound && (checkLower || checkUpper));
 	}
-
+	
+	/**
+	 * Heartbeat functionality. When the successor is alive, ask for its predecessor in order
+	 * to keep the stability of the system.
+	 */
 	private void heartbeat() {
 		if (this.successor.isNull()) {
 			log.debug("Successor not set yet");
@@ -60,7 +81,12 @@ public class ClusterManager extends AbstractActor {
 		this.successor.getActor().tell(new GetPredecessorRequestMessage(), self());
 		log.debug("Ring set as {} - {} - {}", this.predecessor, this.self, this.successor);
 	}
-
+	
+	/**
+	 * Handles an incoming {@link CreateRingMessage}. Create the ring at the beginning. 
+	 * This action is performed by the master node.
+	 * @param msg create ring message.
+	 */
 	private void onCreateRing(CreateRingMessage msg) {
 		this.self = new NodeID(msg.getId(), self());
 		log.info("Creating ring, set id to [{}]", this.self);
@@ -68,11 +94,21 @@ public class ClusterManager extends AbstractActor {
 		this.heartbeat.start(this::heartbeat);
 	}
 	
+	/**
+	 * Handles an incoming {@link MasterNotificationMessage} Get a notification of 
+	 * the master node at the beginning in order to keep its actor reference.
+	 * @param msg master notification message
+	 */
 	private void onMasterNotification(MasterNotificationMessage msg) {
 		this.master = msg.getMaster();
 		this.master.tell(new IdRequestMessage(cluster.selfMember()), self());
 	}
 
+	/**
+	 * Handle an incoming {@link IdResponseMessage} by setting the id of the
+	 * self node and by starting a search of its successor.
+	 * @param msg id response message
+	 */
 	private void onIdResponse(IdResponseMessage msg) {
 		this.self = new NodeID(msg.getId(), self());
 		log.info("Set id to [{}], entry node is [{}]", this.self, msg.getSuccessor().getActor().path().address());
@@ -80,6 +116,13 @@ public class ClusterManager extends AbstractActor {
 		this.heartbeat.start(this::heartbeat);
 	}
 
+	/**
+	 * Handles an incoming {@link FindSuccessorRequestMessage}. If the sender of the message
+	 * has an ID which is between my id and my successor id, then the successor of the sender
+	 * is my successor and replies with {@link FindSuccessorResponseMessage}.
+	 * If not, then forward the message to my successor in order to continue the search.
+	 * @param msg find successor request message
+	 */
 	private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
 		log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
 				this.self, this.successor.getId(), msg.getSender().getId());
@@ -94,7 +137,12 @@ public class ClusterManager extends AbstractActor {
 			this.successor.getActor().forward(msg, getContext());
 		}
 	}
-
+	
+	/**
+	 * Handles an incoming {@link FindSuccessorResponseMessage} that occurs when the successor
+	 * has been found. Then, the successor reference is updated.
+	 * @param msg
+	 */
 	private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
 		this.successor = msg.getSuccessor();
 		log.debug("Successor found as {}", this.successor);
@@ -103,7 +151,6 @@ public class ClusterManager extends AbstractActor {
 
 	/**
 	 * Respond to a {@link GetPredecessorRequestMessage} by sending the reference to the node's predecessor.
-	 *
 	 * @param msg predecessor request message
 	 */
 	private void onGetPredecessorRequest(GetPredecessorRequestMessage msg) {
@@ -149,6 +196,13 @@ public class ClusterManager extends AbstractActor {
 		}
 	}
 	
+	/**
+	 * Handles an {@link UnreachableMember} message. If the member detected as unreachable
+	 * is my successor or predecessor, a new search needs to be performed.
+	 * The master node will forward the message to the {@link PartitionManager} in order
+	 * to mark it as down.
+	 * @param msg unreachable member
+	 */
 	private void onUnreachableMember(UnreachableMember msg) {
 		if (cluster.selfMember().hasRole("master"))
 			partitionManager.forward(msg, getContext());
@@ -165,6 +219,11 @@ public class ClusterManager extends AbstractActor {
 			
 	}
 	
+	/**
+	 * Handles a {@link NewSuccessorRequestMessage} when a new successor reference is 
+	 * required to the master node.
+	 * @param msg new successor response message.
+	 */
 	private void onNewSuccessorResponse(NewSuccessorResponseMessage msg) {
 		log.info("New successor provided from {}", sender());
 		this.successor = msg.getSuccessor();
