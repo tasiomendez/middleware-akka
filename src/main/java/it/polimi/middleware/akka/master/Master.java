@@ -7,6 +7,7 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.master.partitionmanager.PartitionManager;
 import it.polimi.middleware.akka.messages.IdRequestMessage;
+import it.polimi.middleware.akka.messages.PutterMessage;
 
 public class Master extends AbstractActor {
 
@@ -21,6 +22,7 @@ public class Master extends AbstractActor {
     public Receive createReceive() {
         return receiveBuilder()
                 .match(IdRequestMessage.class, msg -> partitionManager.forward(msg, context()))
+                .match(PutterMessage.class, msg -> partitionManager.forward(msg, getContext()))
                 .matchAny(msg -> {
                 })
                 .build();

@@ -9,6 +9,8 @@ import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
 import it.polimi.middleware.akka.messages.IdRequestMessage;
 import it.polimi.middleware.akka.messages.IdResponseMessage;
+import it.polimi.middleware.akka.messages.PropagatePutterMessage;
+import it.polimi.middleware.akka.messages.PutterMessage;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -29,6 +31,14 @@ public class PartitionManager extends AbstractActor {
         return Props.create(PartitionManager.class);
     }
 
+    private Map.Entry<Integer, ActorRef> getSuccessorEntry(int id) {
+        Map.Entry<Integer, ActorRef> entry = members.ceilingEntry(id);
+        if (entry == null) {
+            entry = members.ceilingEntry(0);
+        }
+        return entry;
+    }
+
     private void onIdRequest(IdRequestMessage msg) {
         int id = idCounter.getAndIncrement();
         log.info("Received id request from {}, assigning id {}", sender().path(), id);
@@ -45,10 +55,21 @@ public class PartitionManager extends AbstractActor {
         members.put(id, sender());
     }
 
+    private void onPutter(PutterMessage msg) {
+        String key = msg.getKey();
+        int partition = key.hashCode() % PARTITION_NUMBER;
+        Map.Entry<Integer, ActorRef> successor = getSuccessorEntry(partition);
+
+        log.info("Received put request for key {}, forwarding to {} (id={})",
+                partition, successor.getValue().path(), successor.getKey());
+        successor.getValue().forward(new PropagatePutterMessage(REPLICATION_NUMBER, msg, successor.getValue()), getContext());
+    }
+
     @Override
     public Receive createReceive() {
         return receiveBuilder()
                 .match(IdRequestMessage.class, this::onIdRequest)
+                .match(PutterMessage.class, this::onPutter)
                 .build();
     }
 }

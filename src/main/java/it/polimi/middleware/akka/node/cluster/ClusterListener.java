@@ -11,7 +11,6 @@ import akka.cluster.ClusterEvent.MemberEvent;
 import akka.cluster.ClusterEvent.MemberRemoved;
 import akka.cluster.ClusterEvent.MemberUp;
 import akka.cluster.ClusterEvent.UnreachableMember;
-import akka.cluster.Member;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.IdRequestMessage;
@@ -22,7 +21,6 @@ public class ClusterListener extends AbstractActor {
     private final LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     private final Cluster cluster = Cluster.get(getContext().system());
     private final ActorRef nodeParent;
-    private final Member selfMember = cluster.selfMember();
 
     public ClusterListener(ActorRef nodeParent) {
         this.nodeParent = nodeParent;
@@ -33,7 +31,7 @@ public class ClusterListener extends AbstractActor {
     }
 
     private void onMemberUp(MemberUp msg) {
-        if (msg.member().equals(selfMember)) {
+        if (msg.member().equals(cluster.selfMember())) {
             log.info("Changed status to Up, requesting id to master");
             // get reference to the current master
             final Address masterAddress = cluster.state().getRoleLeader("master");

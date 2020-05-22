@@ -11,6 +11,7 @@ import it.polimi.middleware.akka.messages.FindSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.FindSuccessorResponseMessage;
 import it.polimi.middleware.akka.messages.GetterMessage;
 import it.polimi.middleware.akka.messages.IdResponseMessage;
+import it.polimi.middleware.akka.messages.PropagatePutterMessage;
 import it.polimi.middleware.akka.messages.PutterMessage;
 import it.polimi.middleware.akka.messages.heartbeat.GetPredecessorRequestMessage;
 import it.polimi.middleware.akka.messages.heartbeat.GetPredecessorResponseMessage;
@@ -30,6 +31,7 @@ public class Node extends AbstractActor {
     private final ActorRef clusterManager = getContext().actorOf(ClusterManager.props(), "clusterManager");
     private final ActorRef storage = getContext().actorOf(Storage.props(), "storage");
 
+    private ActorRef master;
     private int id;
     private ActorRef successor = null;
     private int successorId = -1;
@@ -63,7 +65,26 @@ public class Node extends AbstractActor {
         successor.tell(new GetPredecessorRequestMessage(), self());
     }
 
+    private void onPropagatePutter(PropagatePutterMessage msg) {
+        if (msg.isPropagated() && msg.getInitiator().equals(self())) {
+            log.warning("Detected loop while propagating insertion of key-value pair, " +
+                    "this is due to not having enough nodes in the cluster");
+            return;
+        }
+        if (msg.isPropagated()) {
+            storage.tell(msg.getMsg(), self());
+        } else {
+            storage.forward(msg.getMsg(), getContext());
+        }
+        if (msg.getHopsToLive() <= 1) {
+            log.debug("Hops to live reached 0, not forwarding to successor");
+            return;
+        }
+        successor.forward(msg.propagate(), getContext());
+    }
+
     private void onCreateRing(CreateRingMessage msg) {
+        master = sender();
         id = msg.getId();
         log.info("Creating ring, set id to {}", id);
         successor = self();
@@ -72,6 +93,7 @@ public class Node extends AbstractActor {
     }
 
     private void onIdResponse(IdResponseMessage msg) {
+        master = sender();
         id = msg.getId();
         log.info("Set id to {}, entry node is {}", id, msg.getSuccessor().path());
         msg.getSuccessor().tell(new FindSuccessorRequestMessage(id), self());
@@ -151,7 +173,8 @@ public class Node extends AbstractActor {
     public Receive createReceive() {
         return receiveBuilder()
                 .match(GetterMessage.class, msg -> storage.forward(msg, getContext()))
-                .match(PutterMessage.class, msg -> storage.forward(msg, getContext()))
+                .match(PutterMessage.class, msg -> master.forward(msg, getContext()))
+                .match(PropagatePutterMessage.class, this::onPropagatePutter)
                 .match(CreateRingMessage.class, this::onCreateRing)
                 .match(IdResponseMessage.class, this::onIdResponse)
                 .match(FindSuccessorRequestMessage.class, this::onFindSuccessorRequest)
