@@ -28,7 +28,7 @@ public class Node extends AbstractActor {
 	public Receive createReceive() {
 		return receiveBuilder()
 				.match(GetterMessage.class, msg -> storage.forward(msg, getContext()))
-				.match(PutterMessage.class, msg -> storage.forward(msg, getContext()))
+				.match(PutterMessage.class, () -> cluster.selfMember().hasRole("master"), msg -> storage.forward(msg, getContext()))
 
 				.match(MasterNotificationMessage.class, msg -> clusterManager.forward(msg, getContext()))
 

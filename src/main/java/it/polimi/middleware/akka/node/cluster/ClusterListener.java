@@ -25,7 +25,6 @@ public class ClusterListener extends AbstractActor {
 	/**
 	 * A new member has joined the cluster. When joined, the master node 
 	 * notifies the new member who is the master.
-	 * 
 	 * @param msg message
 	 */
 	private void onMemberUp(MemberUp msg) {
@@ -40,7 +39,6 @@ public class ClusterListener extends AbstractActor {
 	/**
 	 * A member has been detected as unreachable. If the member detected is the master, the system
 	 * is terminated. A message to the {@link ClusterManager} is sent to handle the reachability.
-	 * 
 	 * @param msg
 	 */
 	private void onUnreachableMember(UnreachableMember msg) {
@@ -48,14 +46,14 @@ public class ClusterListener extends AbstractActor {
 		if (msg.member().hasRole("master")) {
 			log.error("Master Node detected as Unreachable. Shutting down system.");
 			getContext().getSystem().terminate();
+		} else {
+			// Send message to ClusterManager
+			getContext().getParent().tell(msg, self());
 		}
-		// Send message to ClusterManager
-		getContext().getParent().tell(msg, self());
 	}
-	
+
 	/**
-	 * A member has been removed from the cluster. No longer is in the cluster
-	 * 
+	 * A member has been removed from the cluster. No longer is in the cluster.
 	 * @param msg
 	 */
 	private void onMemberRemoved(MemberRemoved msg) {
