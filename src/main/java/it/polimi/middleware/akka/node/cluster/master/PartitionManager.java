@@ -1,9 +1,5 @@
 package it.polimi.middleware.akka.node.cluster.master;
 
-import java.util.Random;
-import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.cluster.Cluster;
@@ -17,7 +13,11 @@ import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
-import it.polimi.middleware.akka.node.NodeID;
+import it.polimi.middleware.akka.node.Reference;
+
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The PartitionManager actor belongs to the master node. It is in charge of keeping track of 
@@ -35,7 +35,7 @@ public class PartitionManager extends AbstractActor {
     
     // The members tree stores id and actors, while the ids tree 
     // associates each address to an id.
-    private final TreeMap<Integer, NodeID> members = new TreeMap<>();
+    private final TreeMap<Integer, Reference> members = new TreeMap<>();
     private final TreeMap<Integer, Integer> ids = new TreeMap<>();
     
     public PartitionManager() {
@@ -43,7 +43,7 @@ public class PartitionManager extends AbstractActor {
 		getContext().getParent().tell(new CreateRingMessage(counter.get()), self());
 		
 		// Actor stored references ClusterManager
-		final NodeID node = new NodeID(counter.get(), getContext().getParent());
+		final Reference node = new Reference(counter.get(), getContext().getParent());
 		this.members.put(node.getId(), node);
 		this.ids.put(getContext().self().path().address().hashCode(), node.getId());
 	}
@@ -52,12 +52,12 @@ public class PartitionManager extends AbstractActor {
         final int id = counter.incrementAndGet();
         log.info("Received id request from {}, assigning id {}", sender().path().address(), id);
         
-        final NodeID entry = this.getRandomMember();
+        final Reference entry = this.getRandomMember();
         log.debug("Assigning successor with id {}, path {}", entry.getId(), entry.getActor().path());
         sender().tell(new IdResponseMessage(id, entry), self());
         
         // Actor stored references ClusterManager
-        final NodeID node = new NodeID(id, sender());
+        final Reference node = new Reference(id, sender());
         this.members.put(node.getId(), node);
         this.ids.put(msg.getMember().address().hashCode(), node.getId());
     }
@@ -70,13 +70,13 @@ public class PartitionManager extends AbstractActor {
     }
     
     private void onNewSuccessorRequest(NewSuccessorRequestMessage msg) {
-    	final NodeID entry = getRandomMember();
+    	final Reference entry = getRandomMember();
     	sender().tell(new NewSuccessorResponseMessage(entry), self());
     }
     
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
     	final int key = msg.getEntry().getKey().hashCode() % PARTITION_NUMBER;
-    	final NodeID partition = members.lowerEntry(key).getValue();
+    	final Reference partition = members.lowerEntry(key).getValue();
     	log.debug("Partition for key [{}] is [{}]", msg.getEntry().getKey(), partition.getActor().path());
     	partition.getActor().tell(new GetPartitionResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
     }
@@ -86,11 +86,11 @@ public class PartitionManager extends AbstractActor {
      * 
      * @return the member
      */
-    private NodeID getRandomMember() {
+    private Reference getRandomMember() {
     	// Get random member
         final Object[] entries = this.members.values().toArray();
         final Random generator = new Random();
-        return (NodeID) entries[generator.nextInt(entries.length)];
+        return (Reference) entries[generator.nextInt(entries.length)];
     }
 
     @Override

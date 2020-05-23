@@ -1,26 +1,17 @@
 package it.polimi.middleware.akka.messages.join;
 
-import it.polimi.middleware.akka.node.NodeID;
-import scala.Serializable;
+import it.polimi.middleware.akka.node.Reference;
 
-public class FindSuccessorResponseMessage implements Serializable {
+public class FindSuccessorResponseMessage extends Reference {
 
-    private static final long serialVersionUID = 1L;
-
-    private final NodeID successor;
-
-    public FindSuccessorResponseMessage(NodeID successor) {
-        this.successor = successor;
-    }
-
-    public NodeID getSuccessor() {
-        return successor;
+    public FindSuccessorResponseMessage(Reference successor) {
+        super(successor);
     }
 
     @Override
     public String toString() {
         return "FindSuccessorResponseMessage [" +
-                "successor=" + successor +
+                "successor=" + getActor() +
                 ']';
     }
 }

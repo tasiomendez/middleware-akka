@@ -1,27 +1,17 @@
 package it.polimi.middleware.akka.messages.update;
 
-import java.io.Serializable;
+import it.polimi.middleware.akka.node.Reference;
 
-import it.polimi.middleware.akka.node.NodeID;
+public class NewSuccessorResponseMessage extends Reference {
 
-public class NewSuccessorResponseMessage implements Serializable {
-	
-	private static final long serialVersionUID = 1L;
-
-    private final NodeID successor;
-
-    public NewSuccessorResponseMessage(NodeID successor) {
-        this.successor = successor;
-    }
-
-    public NodeID getSuccessor() {
-        return successor;
+    public NewSuccessorResponseMessage(Reference successor) {
+        super(successor);
     }
 
     @Override
     public String toString() {
         return "NewSuccessorResponseMessage [" +
-                "node=" + successor +
+                "node=" + getActor() +
                 ']';
     }
 

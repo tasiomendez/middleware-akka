@@ -17,10 +17,9 @@ import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
-import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
-import it.polimi.middleware.akka.node.NodeID;
+import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
 
 /**
@@ -38,14 +37,14 @@ public class ClusterManager extends AbstractActor {
 	private final ActorRef partitionManager;
 
 	private final HeartBeat heartbeat = HeartBeat.get(getContext().getSystem());
+
+	private final Reference self = Reference.empty();
+	private final Reference successor = Reference.empty();
+	private final Reference predecessor = Reference.empty();
 	
 	// Actor Reference to Master ClusterManager
 	// Set as default to self. It will be updated to the real one after joining the cluster
 	private ActorRef master = getContext().self();
-	
-	private NodeID self;
-	private NodeID successor = new NodeID(-1, null);
-	private NodeID predecessor = new NodeID(-1, null);
 
 	public ClusterManager() {
 		this.partitionManager = (cluster.selfMember().hasRole("master")) ?
@@ -73,10 +72,6 @@ public class ClusterManager extends AbstractActor {
 	 * to keep the stability of the system.
 	 */
 	private void heartbeat() {
-		if (this.successor.isNull()) {
-			log.debug("Successor not set yet");
-			return;
-		} 
 		this.successor.getActor().tell(new GetPredecessorRequestMessage(), self());
 		log.debug("Ring set as {} - {} - {}", this.predecessor, this.self, this.successor);
 	}
@@ -88,9 +83,9 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg create ring message.
 	 */
 	private void onCreateRing(CreateRingMessage msg) {
-		this.self = new NodeID(msg.getId(), self());
+		this.self.update(msg.getId(), self());
 		log.info("Creating ring, set id to [{}]", this.self);
-		this.successor = new NodeID(this.self.getId(), self());
+		this.successor.update(this.self);
 		this.heartbeat.start(this::heartbeat);
 	}
 	
@@ -113,10 +108,9 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg id response message
 	 */
 	private void onIdResponse(IdResponseMessage msg) {
-		this.self = new NodeID(msg.getId(), self());
+		this.self.update(msg.getId(), self());
 		log.info("Set id to [{}], entry node is [{}]", this.self, msg.getSuccessor().getActor().path().address());
 		msg.getSuccessor().getActor().tell(new FindSuccessorRequestMessage(this.self), self());
-		this.heartbeat.start(this::heartbeat);
 	}
 
 	/**
@@ -129,15 +123,15 @@ public class ClusterManager extends AbstractActor {
 	 */
 	private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
 		log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
-				this.self, this.successor.getId(), msg.getSender().getId());
+				this.self, this.successor, msg);
 
-		if (isBetween(msg.getSender().getId(), this.self.getId(), this.successor.getId(), false, true)) {
+		if (isBetween(msg.getId(), this.self.getId(), this.successor.getId(), false, true)) {
 			// reply directly to the request
-			log.debug("Successor found for requester={}", msg.getSender().getId());
+			log.debug("Successor found for requester={}", msg);
 			sender().tell(new FindSuccessorResponseMessage(this.successor), self());
 		} else {
 			// forward the message to the successor
-			log.debug("Successor not found for requester={}. Forwarding message to successor", msg.getSender().getId());
+			log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
 			this.successor.getActor().forward(msg, getContext());
 		}
 	}
@@ -149,9 +143,10 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg
 	 */
 	private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
-		this.successor = msg.getSuccessor();
+		this.successor.update(msg);
 		log.debug("Successor found as {}", this.successor);
 		log.info("Successor updated to {}", this.successor.getActor().path().address());
+		this.heartbeat.start(this::heartbeat);
 	}
 
 	/**
@@ -172,13 +167,13 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg predecessor response message
 	 */
 	private void onGetPredecessorResponse(GetPredecessorResponseMessage msg) {
-		int successorPredecessorId = msg.getPredecessor().getId();
+		int successorPredecessorId = msg.getId();
 		// if the `predecessor of the successor` is between the node id and the successor id 
 		// then update the successor
-		if (!msg.getPredecessor().isNull() &&
+		if (!msg.isNull() &&
 				isBetween(successorPredecessorId, this.self.getId(), this.successor.getId(), false, false)) {
 			log.debug("Successor updated: [{}] -> [{}]", this.successor.getId(), successorPredecessorId);
-			this.successor = new NodeID(msg.getPredecessor().getId(), msg.getPredecessor().getActor());
+			this.successor.update(msg);
 			log.info("Successor updated to {}", this.successor.getActor().path().address());
 		}
 		// notify the successor of the presence of this node
@@ -193,11 +188,11 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg notification message
 	 */
 	private void onNotify(NotifyMessage msg) {
-		log.debug("Received notification from predecessor {}", msg.getSender());
-		if (this.predecessor.isNull() || isBetween(msg.getSender().getId(), this.predecessor.getId(), this.self.getId(), false, false)) {
+		log.debug("Received notification from predecessor {}", msg);
+		if (this.predecessor.isNull() || isBetween(msg.getId(), this.predecessor.getId(), this.self.getId(), false, false)) {
 			log.debug("Predecessor updated: [{}] -> [{}]", 
-					this.predecessor.getId() == -1 ? "null" : this.predecessor.getId(), msg.getSender().getId());
-			this.predecessor = new NodeID(msg.getSender().getId(), sender());
+					this.predecessor.getId() == -1 ? "null" : this.predecessor.getId(), msg.getId());
+			this.predecessor.update(msg);
 			log.info("Predecessor updated to {}", this.predecessor.getActor().path().address());
 		}
 	}
@@ -221,7 +216,7 @@ public class ClusterManager extends AbstractActor {
 			
 		if (this.predecessor.getActor().path().address().equals(msg.member().address())) {
 			log.info("Predecessor detected as unreachable. Trying to find the new one");
-			this.predecessor = new NodeID(-1, null);
+			this.predecessor.update(Reference.empty());
 		}
 			
 	}
@@ -234,7 +229,7 @@ public class ClusterManager extends AbstractActor {
 	 */
 	private void onNewSuccessorResponse(NewSuccessorResponseMessage msg) {
 		log.info("New successor provided from {}", sender());
-		this.successor = msg.getSuccessor();
+		this.successor.update(msg);
 	}
 
 	@Override
