@@ -11,6 +11,7 @@ import it.polimi.middleware.akka.messages.IdRequestMessage;
 import it.polimi.middleware.akka.messages.IdResponseMessage;
 import it.polimi.middleware.akka.messages.PropagatePutterMessage;
 import it.polimi.middleware.akka.messages.PutterMessage;
+import it.polimi.middleware.akka.node.Reference;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -49,7 +50,7 @@ public class PartitionManager extends AbstractActor {
         } else {
             Map.Entry<Integer, ActorRef> entry = members.lastEntry();
             log.debug("Sending successor with id {}, path {}", entry.getKey(), entry.getValue().path());
-            sender().tell(new IdResponseMessage(id, entry.getValue(), entry.getKey()), self());
+            sender().tell(new IdResponseMessage(id, new Reference(entry.getKey(), entry.getValue())), self());
         }
 
         members.put(id, sender());

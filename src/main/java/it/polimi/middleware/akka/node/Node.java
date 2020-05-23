@@ -23,20 +23,16 @@ import java.time.Duration;
 
 public class Node extends AbstractActor {
 
-    private static final int PARTITION_NUMBER = (int) Math.pow(2, 32);
-    private static final int REPLICATION_NUMBER = 2;
-
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().getSystem());
     private final ActorRef clusterManager = getContext().actorOf(ClusterManager.props(), "clusterManager");
     private final ActorRef storage = getContext().actorOf(Storage.props(), "storage");
 
+    private final Reference successor = Reference.empty();
+    private final Reference predecessor = Reference.empty();
+
     private ActorRef master;
     private int id;
-    private ActorRef successor = null;
-    private int successorId = -1;
-    private ActorRef predecessor = null;
-    private int predecessorId = -1;
 
     public static Props props() {
         return Props.create(Node.class);
@@ -58,11 +54,11 @@ public class Node extends AbstractActor {
     }
 
     private void heartbeat() {
-        if (successor == null) {
+        if (successor.getActorRef() == null) {
             log.debug("Successor not set yet");
             return;
         }
-        successor.tell(new GetPredecessorRequestMessage(), self());
+        successor.getActorRef().tell(new GetPredecessorRequestMessage(), self());
     }
 
     private void onPropagatePutter(PropagatePutterMessage msg) {
@@ -80,45 +76,43 @@ public class Node extends AbstractActor {
             log.debug("Hops to live reached 0, not forwarding to successor");
             return;
         }
-        successor.forward(msg.propagate(), getContext());
+        successor.getActorRef().forward(msg.propagate(), getContext());
     }
 
     private void onCreateRing(CreateRingMessage msg) {
         master = sender();
         id = msg.getId();
         log.info("Creating ring, set id to {}", id);
-        successor = self();
-        successorId = id;
+        successor.update(id, self());
         initHeartBeat();
     }
 
     private void onIdResponse(IdResponseMessage msg) {
         master = sender();
         id = msg.getId();
-        log.info("Set id to {}, entry node is {}", id, msg.getSuccessor().path());
-        msg.getSuccessor().tell(new FindSuccessorRequestMessage(id), self());
+        log.info("Set id to {}, entry node is {}", id, msg.getSuccessor().getActorRef().path());
+        msg.getSuccessor().getActorRef().tell(new FindSuccessorRequestMessage(id), self());
         initHeartBeat();
     }
 
     private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
         log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
-                id, successorId, msg.getId());
+                id, successor, msg.getId());
 
-        if (isBetween(msg.getId(), id, successorId, false, true)) {
+        if (isBetween(msg.getId(), id, successor.getId(), false, true)) {
             // reply directly to the request
             log.debug("Replying");
-            sender().tell(new FindSuccessorResponseMessage(successor, successorId), self());
+            sender().tell(new FindSuccessorResponseMessage(successor), self());
         } else {
             // forward the message to the successor
             log.debug("Forwarding to successor");
-            successor.forward(msg, getContext());
+            successor.getActorRef().forward(msg, getContext());
         }
     }
 
     private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
-        successor = msg.getSuccessor();
-        successorId = msg.getSuccessorId();
-        log.debug("Set successor to {}", successorId);
+        successor.update(msg);
+        log.debug("Set successor to {}", successor);
     }
 
     /**
@@ -127,7 +121,7 @@ public class Node extends AbstractActor {
      * @param msg the predecessor request message
      */
     private void onGetPredecessorRequest(GetPredecessorRequestMessage msg) {
-        sender().tell(new GetPredecessorResponseMessage(predecessorId, predecessor), self());
+        sender().tell(new GetPredecessorResponseMessage(predecessor), self());
     }
 
     /**
@@ -140,18 +134,17 @@ public class Node extends AbstractActor {
      */
     private void onGetPredecessorResponse(GetPredecessorResponseMessage msg) {
         // get the predecessor id from the message
-        int successorPredecessorId = msg.getPredecessorId();
+        int successorPredecessorId = msg.getId();
         // if the `predecessor of the successor` is between the node id and the successor id then update the
         // successor
-        if (msg.getPredecessor() != null &&
-                isBetween(successorPredecessorId, id, successorId, false, false)) {
-            log.debug("Updating successor: {} -> {}", successorId, successorPredecessorId);
-            successor = msg.getPredecessor();
-            successorId = successorPredecessorId;
+        if (msg.getActorRef() != null &&
+                isBetween(successorPredecessorId, id, successor.getId(), false, false)) {
+            log.debug("Updating successor: {} -> {}", successor, msg);
+            successor.update(msg);
         }
         // notify the successor of the presence of this node
-        log.debug("Sending notification to {}", successorId);
-        successor.tell(new NotifyMessage(id), self());
+        log.debug("Sending notification to {}", successor);
+        successor.getActorRef().tell(new NotifyMessage(new Reference(id, self())), self());
     }
 
     /**
@@ -162,10 +155,9 @@ public class Node extends AbstractActor {
      */
     private void onNotify(NotifyMessage msg) {
         log.debug("Received notification from {}", msg.getId());
-        if (predecessor == null || isBetween(msg.getId(), predecessorId, id, false, false)) {
-            log.debug("Updating predecessor: {} -> {}", predecessorId == -1 ? "null" : predecessorId, msg.getId());
-            predecessor = sender();
-            predecessorId = msg.getId();
+        if (predecessor.getActorRef() == null || isBetween(msg.getId(), predecessor.getId(), id, false, false)) {
+            log.debug("Updating predecessor: {} -> {}", predecessor, msg);
+            predecessor.update(msg);
         }
     }
 

@@ -1,18 +1,10 @@
 package it.polimi.middleware.akka.messages.heartbeat;
 
-import java.io.Serializable;
+import it.polimi.middleware.akka.node.Reference;
 
-public class NotifyMessage implements Serializable {
+public class NotifyMessage extends Reference {
 
-    private static final long serialVersionUID = 1L;
-
-    private final int id;
-
-    public NotifyMessage(int id) {
-        this.id = id;
-    }
-
-    public int getId() {
-        return id;
+    public NotifyMessage(Reference reference) {
+        super(reference);
     }
 }
