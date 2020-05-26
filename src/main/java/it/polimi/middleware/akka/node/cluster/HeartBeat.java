@@ -1,18 +1,20 @@
 package it.polimi.middleware.akka.node.cluster;
 
-import java.time.Duration;
-
 import akka.actor.ActorSystem;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
+import java.time.Duration;
+
 public class HeartBeat {
 	
-	private static final Duration INITIAL_DELAY = Duration.ofSeconds(4);
-	private static final Duration BETWEEN_DELAY = Duration.ofSeconds(4);
+	private static final Duration INITIAL_DELAY = Duration.ofSeconds(6);
+	private static final Duration BETWEEN_DELAY = Duration.ofSeconds(6);
 	
 	private final ActorSystem system;
 	private final LoggingAdapter log;
+
+	private boolean started = false;
 
 	private static HeartBeat instance; 
 	
@@ -59,6 +61,10 @@ public class HeartBeat {
                 BETWEEN_DELAY, // delay between each invocation
                 runnable,
                 this.system.dispatcher());
+        this.started = true;
 	}
-	
+
+	public boolean started() {
+		return this.started;
+	}
 }

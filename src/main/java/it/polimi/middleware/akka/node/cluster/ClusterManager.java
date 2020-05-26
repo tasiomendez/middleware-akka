@@ -25,6 +25,8 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
 
+import java.util.TreeMap;
+
 /**
  * The ClusterManager actor is in charge of managing the cluster taking into account if a new node is joined, if a node
  * is removed from the cluster and all the changes within it. It is the one in charge of managing the stability between
@@ -34,7 +36,9 @@ import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
  */
 public class ClusterManager extends AbstractActor {
 
+    private static final int PARTITION_NUMBER = (int) Math.pow(2, 16); // TODO replace with reference to config files
     private static final int REPLICATION_NUMBER = 2; // TODO replace with reference to config files
+    private static final int FINGER_TABLE_SIZE = 16; // TODO replace with reference to config files
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().system());
@@ -46,6 +50,8 @@ public class ClusterManager extends AbstractActor {
     private final Reference self = Reference.empty();
     private final Reference successor = Reference.empty();
     private final Reference predecessor = Reference.empty();
+
+    private final TreeMap<Integer, Reference> fingerTable = new TreeMap<>();
 
     // Actor Reference to Master ClusterManager
     // Set as default to self. It will be updated to the real one after joining the cluster
@@ -76,13 +82,23 @@ public class ClusterManager extends AbstractActor {
         return Props.create(ClusterManager.class);
     }
 
+    private void initFingerTable() {
+        for (int i = 0; i < FINGER_TABLE_SIZE; i++) {
+            fingerTable.put((self.getId() + (int) Math.pow(2, i)) % PARTITION_NUMBER, this.self);
+        }
+    }
+
     /**
      * Heartbeat functionality. When the successor is alive, ask for its predecessor in order to keep the stability of
      * the system.
      */
     private void heartbeat() {
         this.successor.getActor().tell(new GetPredecessorRequestMessage(), self());
+        for (Integer key : fingerTable.keySet()) {
+            self().tell(new FindSuccessorRequestMessage(key), self());
+        }
         log.debug("Ring set as {} - {} - {}", this.predecessor, this.self, this.successor);
+        log.debug("Finger table set as {}", fingerTable);
     }
 
     /**
@@ -95,6 +111,7 @@ public class ClusterManager extends AbstractActor {
         this.self.update(msg.getId(), self());
         log.info("Creating ring, set id to [{}]", this.self);
         this.successor.update(this.self);
+        initFingerTable();
         this.heartbeat.start(this::heartbeat);
     }
 
@@ -119,7 +136,8 @@ public class ClusterManager extends AbstractActor {
     private void onIdResponse(IdResponseMessage msg) {
         this.self.update(msg.getId(), self());
         log.info("Set id to [{}], entry node is [{}]", this.self, msg.getSuccessor().getActor().path().address());
-        msg.getSuccessor().getActor().tell(new FindSuccessorRequestMessage(this.self), self());
+        initFingerTable();
+        msg.getSuccessor().getActor().tell(new FindSuccessorRequestMessage(this.self.getId()), self());
     }
 
     /**
@@ -133,10 +151,10 @@ public class ClusterManager extends AbstractActor {
         log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
                 this.self, this.successor, msg);
 
-        if (isBetween(msg.getId(), this.self.getId(), this.successor.getId(), false, true)) {
+        if (isBetween(msg.getRequest(), this.self.getId(), this.successor.getId(), false, true)) {
             // reply directly to the request
             log.debug("Successor found for requester={}", msg);
-            sender().tell(new FindSuccessorResponseMessage(this.successor), self());
+            sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
         } else {
             // forward the message to the successor
             log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
@@ -151,10 +169,18 @@ public class ClusterManager extends AbstractActor {
      * @param msg
      */
     private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
-        this.successor.update(msg);
-        log.debug("Successor found as {}", this.successor);
-        log.info("Successor updated to {}", this.successor.getActor().path().address());
-        this.heartbeat.start(this::heartbeat);
+        if (msg.getRequest() == this.self.getId()) {
+            this.successor.update(msg);
+            log.debug("Successor found as {}", this.successor);
+            log.info("Successor updated to {}", this.successor.getActor().path().address());
+            if (!this.heartbeat.started()) {
+                this.heartbeat.start(this::heartbeat);
+            }
+        }
+
+        if (fingerTable.containsKey(msg.getRequest())) {
+            fingerTable.put(msg.getRequest(), msg);
+        }
     }
 
     /**
@@ -304,4 +330,8 @@ public class ClusterManager extends AbstractActor {
                 .build();
     }
 
+    @Override
+    public String toString() {
+        return this.self.toString();
+    }
 }

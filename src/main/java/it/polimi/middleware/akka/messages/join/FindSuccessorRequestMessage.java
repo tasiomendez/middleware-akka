@@ -1,17 +1,23 @@
 package it.polimi.middleware.akka.messages.join;
 
-import it.polimi.middleware.akka.node.Reference;
+import java.io.Serializable;
 
-public class FindSuccessorRequestMessage extends Reference {
+public class FindSuccessorRequestMessage implements Serializable {
 
-    public FindSuccessorRequestMessage(Reference sender) {
-        super(sender);
+    private final int request;
+
+    public FindSuccessorRequestMessage(int request) {
+        this.request = request;
+    }
+
+    public int getRequest() {
+        return request;
     }
 
     @Override
     public String toString() {
         return "FindSuccessorRequestMessage [" +
-                "node=" + getActor() +
+                "node=" + request +
                 ']';
     }
 }

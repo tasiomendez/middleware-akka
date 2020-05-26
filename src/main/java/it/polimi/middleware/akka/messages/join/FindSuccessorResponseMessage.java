@@ -4,8 +4,15 @@ import it.polimi.middleware.akka.node.Reference;
 
 public class FindSuccessorResponseMessage extends Reference {
 
-    public FindSuccessorResponseMessage(Reference successor) {
-        super(successor);
+    private final int request;
+
+    public FindSuccessorResponseMessage(Reference response, int request) {
+        super(response);
+        this.request = request;
+    }
+
+    public int getRequest() {
+        return request;
     }
 
     @Override

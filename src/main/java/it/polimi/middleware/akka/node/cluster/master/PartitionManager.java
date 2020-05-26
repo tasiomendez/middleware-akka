@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class PartitionManager extends AbstractActor {
 
-    private static final int PARTITION_NUMBER = (int) Math.pow(2, 32);
+    private static final int PARTITION_NUMBER = (int) Math.pow(2, 16);
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().getSystem());
