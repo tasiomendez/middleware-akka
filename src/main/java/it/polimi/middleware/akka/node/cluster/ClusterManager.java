@@ -281,7 +281,7 @@ public class ClusterManager extends AbstractActor {
             return;
         }
         log.debug("Received PropagateRequestMessage from {} with hops to live {}", sender(), msg.getHopsToLive());
-        getContext().getParent().tell(new PropagateMessage(msg.getEntry()), self());
+        getContext().getParent().tell(new PropagateMessage(msg.getEntry(), msg.getOriginator().path().address()), self());
         if (msg.mustPropagate()) {
             log.debug("Propagating PutterMessage to successor nodes", msg.getHopsToLive());
             successor.getActor().tell(msg.propagate(), self());

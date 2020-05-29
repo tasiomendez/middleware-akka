@@ -1,8 +1,8 @@
 package it.polimi.middleware.akka.messages.storage;
 
-import akka.actor.ActorRef;
-
 import java.io.Serializable;
+
+import akka.actor.ActorRef;
 
 public class PropagateRequestMessage implements Serializable {
 

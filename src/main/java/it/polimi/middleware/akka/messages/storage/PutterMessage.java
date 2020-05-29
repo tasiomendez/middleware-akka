@@ -1,6 +1,8 @@
 package it.polimi.middleware.akka.messages.storage;
 
 import java.io.Serializable;
+import java.util.AbstractMap;
+import java.util.HashMap;
 
 public class PutterMessage implements Serializable {
 
@@ -20,6 +22,10 @@ public class PutterMessage implements Serializable {
 
 	public final String getValue() {
 		return value;
+	}
+	
+	public final HashMap.Entry<String, String> toHashMapEntry() {
+		return new AbstractMap.SimpleEntry<String, String>(this.key, this.value);
 	}
 
 	@Override

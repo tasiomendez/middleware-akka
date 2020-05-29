@@ -101,7 +101,7 @@ public class Storage {
 	public ReplyMessage getAll() {
 		try {
 			log.info("Get request received for all keys");
-			return new SuccessMessage(this.storage);
+			return new SuccessMessage(this.storage, this.backup);
 		} catch (Exception e) {
 			return new ErrorMessage(e);
 		}
@@ -114,9 +114,11 @@ public class Storage {
 	 * @param storage storage to backup
 	 * @return data stored
 	 */
-	public HashMap<String, String> addPartition(Address address, HashMap<String,String> storage) {
-		log.debug("Add new to backup from {}", address);
-		return this.backup.put(address, storage);
+	public String addToPartition(Address address, HashMap.Entry<String,String> entry) {
+		log.debug("Add new entry to backup from {}", address);
+		if (!this.backup.containsKey(address))
+			this.backup.put(address, new HashMap<String, String>());
+		return this.backup.get(address).put(entry.getKey(), entry.getValue());
 	}
 	
 	/**

@@ -12,6 +12,7 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.http.javadsl.server.AllDirectives;
 import akka.http.javadsl.server.Route;
+import it.polimi.middleware.akka.messages.storage.GetterBackupMessage;
 import it.polimi.middleware.akka.messages.storage.GetterMessage;
 import it.polimi.middleware.akka.messages.storage.PutterMessage;
 
@@ -31,7 +32,7 @@ public class Router extends AllDirectives {
 	private Router(ActorSystem system) {
 		this.system = system;
 		this.log = Logging.getLogger(system, this);
-		this.gateway = system.actorSelection("/user/node");
+		this.gateway = system.actorSelection("/user/node/storageManager");
 	}
 	
 	public static Router get(ActorSystem system) {
@@ -75,6 +76,7 @@ public class Router extends AllDirectives {
 				() -> get(
 						() -> concat(
 								path(segment("get"), this::onGetRequest),									// database/get
+								path(segment("get").slash(segment("node")), this::onGetBackupRequest), 		// database/get/node
 								path(segment("get").slash(segment()), this::onGetRequest), 					// database/get/:key
 								path(segment("put").slash(segment()).slash(segment()), this::onPutRequest)  // database/put/:key/:value
 								)
@@ -92,6 +94,18 @@ public class Router extends AllDirectives {
 	private Route onGetRequest() {
 		log.debug("Request received on /database/get");
 		final GetterMessage msg = new GetterMessage();
+		return routeGateway(msg);
+	}
+	
+	/**
+	 * Handler which search for keys on current node
+	 * Path - /database/get/node
+	 * 
+	 * @return Route object
+	 */
+	private Route onGetBackupRequest() {
+		log.debug("Request received on /database/get/node");
+		final GetterBackupMessage msg = new GetterBackupMessage();
 		return routeGateway(msg);
 	}
 	
