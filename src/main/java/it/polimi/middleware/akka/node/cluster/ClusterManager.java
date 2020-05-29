@@ -36,9 +36,9 @@ import java.util.TreeMap;
  */
 public class ClusterManager extends AbstractActor {
 
-    private static final int PARTITION_NUMBER = (int) Math.pow(2, 16); // TODO replace with reference to config files
-    private static final int REPLICATION_NUMBER = 2; // TODO replace with reference to config files
-    private static final int FINGER_TABLE_SIZE = 16; // TODO replace with reference to config files
+    private final int PARTITION_NUMBER = getContext().getSystem().settings().config().getInt("clustering.partition.max");
+    private final int REPLICATION_NUMBER = getContext().getSystem().settings().config().getInt("clustering.replication");
+    private final int FINGER_TABLE_SIZE = (int) (Math.log(this.PARTITION_NUMBER) / Math.log(2));
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().system());
