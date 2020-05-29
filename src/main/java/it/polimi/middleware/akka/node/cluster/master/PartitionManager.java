@@ -3,7 +3,6 @@ package it.polimi.middleware.akka.node.cluster.master;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import akka.actor.AbstractActor;
 import akka.actor.Props;
@@ -29,7 +28,8 @@ public class PartitionManager extends AbstractActor {
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().getSystem());
 
-    private final AtomicInteger counter = new AtomicInteger(0);
+    // Random ID generator
+    private final Random generator = new Random();
 
     // The members tree stores id and actors, while the ids tree 
     // associates each address to an id.
@@ -37,11 +37,12 @@ public class PartitionManager extends AbstractActor {
     private final TreeMap<Integer, Integer> ids = new TreeMap<>();
 
     public PartitionManager() {
+    	final int masterId = generator.nextInt(PARTITION_NUMBER);
         // Create ring at beginning
-        getContext().getParent().tell(new CreateRingMessage(counter.get()), self());
+        getContext().getParent().tell(new CreateRingMessage(masterId), self());
 
         // Actor stored references ClusterManager
-        final Reference node = new Reference(counter.get(), getContext().getParent());
+        final Reference node = new Reference(masterId, getContext().getParent());
         this.members.put(node.getId(), node);
         this.ids.put(getContext().self().path().address().hashCode(), node.getId());
     }
@@ -51,7 +52,11 @@ public class PartitionManager extends AbstractActor {
     }
 
     private void onIdRequest(IdRequestMessage msg) {
-        final int id = counter.incrementAndGet();
+        int id;
+        do {
+        	id = generator.nextInt(PARTITION_NUMBER);
+        } while (members.containsKey(id));
+        
         log.info("Received id request from {}, assigning id {}", sender().path().address(), id);
 
         final Reference entry = this.getRandomMember();
