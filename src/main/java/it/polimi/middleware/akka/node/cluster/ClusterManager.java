@@ -168,16 +168,22 @@ public class ClusterManager extends AbstractActor {
      * @param msg
      */
     private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
-        if (msg.getIdRequest() == this.self.getId()) {
-            this.successor.update(msg.getResponse());
-            log.debug("Successor found as {}", this.successor);
-            log.info("Successor updated to {}", this.successor.getActor().path());
-            if (!this.heartbeat.started()) {
-                this.heartbeat.start(this::heartbeat);
-            }
-        }
-
-        if (fingerTable.containsKey(msg.getIdRequest())) {
+    	this.successor.update(msg.getResponse());
+    	log.debug("Successor found as {}", this.successor);
+    	log.info("Successor updated to {}", this.successor.getActor().path());
+    	if (!this.heartbeat.started()) {
+    		this.heartbeat.start(this::heartbeat);
+    	}
+    }
+    
+    /**
+     * Handles an incoming {@link FindSuccessorResponseMessage} that occurs when the successor has been found when asking
+     * for it on a Heartbeat message.
+     * 
+     * @param msg
+     */
+    private void onFindSuccessorFingerTableResponse(FindSuccessorResponseMessage msg) {
+    	if (fingerTable.containsKey(msg.getIdRequest())) {
             fingerTable.put(msg.getIdRequest(), msg.getResponse());
         }
     }
@@ -295,7 +301,11 @@ public class ClusterManager extends AbstractActor {
                 .match(IdResponseMessage.class, this::onIdResponse)
 
                 .match(FindSuccessorRequestMessage.class, this::onFindSuccessorRequest)
-                .match(FindSuccessorResponseMessage.class, this::onFindSuccessorResponse)
+                .match(FindSuccessorResponseMessage.class, 
+                		(msg) -> msg.getIdRequest() == this.self.getId(), // Current node asks for its successor
+                		this::onFindSuccessorResponse)
+                .match(FindSuccessorResponseMessage.class, 
+                		this::onFindSuccessorFingerTableResponse) // Answer to a FingerTable Heartbeat message
 
                 // HeartBeat messages
                 .match(GetPredecessorRequestMessage.class, this::onGetPredecessorRequest)
