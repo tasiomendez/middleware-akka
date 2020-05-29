@@ -24,7 +24,7 @@ import it.polimi.middleware.akka.node.Reference;
  */
 public class PartitionManager extends AbstractActor {
 
-    private final int PARTITION_NUMBER = (int) Math.pow(2, 16);
+    private final int PARTITION_NUMBER = getContext().getSystem().settings().config().getInt("clustering.partition.max");
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().getSystem());
