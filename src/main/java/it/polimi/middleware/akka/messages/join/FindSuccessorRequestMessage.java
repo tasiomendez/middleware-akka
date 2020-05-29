@@ -4,7 +4,9 @@ import java.io.Serializable;
 
 public class FindSuccessorRequestMessage implements Serializable {
 
-    private final int request;
+	private static final long serialVersionUID = 1L;
+	
+	private final int request;
 
     public FindSuccessorRequestMessage(int request) {
         this.request = request;

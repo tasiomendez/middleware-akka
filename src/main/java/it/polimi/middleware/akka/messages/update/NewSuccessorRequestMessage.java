@@ -4,7 +4,9 @@ import it.polimi.middleware.akka.node.Reference;
 
 public class NewSuccessorRequestMessage extends Reference {
 
-    public NewSuccessorRequestMessage(Reference sender) {
+	private static final long serialVersionUID = 1L;
+
+	public NewSuccessorRequestMessage(Reference sender) {
         super(sender);
     }
 
