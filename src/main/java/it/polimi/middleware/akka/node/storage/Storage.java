@@ -94,6 +94,16 @@ public class Storage {
 	}
 	
 	/**
+	 * Check if contains a given key
+	 * 
+	 * @param key
+	 * @return true if it is contained, otherwise false
+	 */
+	public boolean contains(String key) {
+		return this.storage.containsKey(key);
+	}
+	
+	/**
 	 * Get all keys and values stored in the current node.
 	 * 
 	 * @return reply message

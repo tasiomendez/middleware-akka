@@ -6,6 +6,7 @@ import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.node.cluster.ClusterManager;
@@ -34,6 +35,7 @@ public class Node extends AbstractActor {
 
                 .match(PropagateMessage.class, msg -> storageManager.forward(msg, getContext()))
                 .match(GetPartitionResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
+                .match(GetPartitionGetterResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

@@ -76,9 +76,9 @@ public class Router extends AllDirectives {
 				() -> get(
 						() -> concat(
 								path(segment("get"), this::onGetRequest),									// database/get
-								path(segment("get").slash(segment("node")), this::onGetBackupRequest), 		// database/get/node
 								path(segment("get").slash(segment()), this::onGetRequest), 					// database/get/:key
-								path(segment("put").slash(segment()).slash(segment()), this::onPutRequest)  // database/put/:key/:value
+								path(segment("put").slash(segment()).slash(segment()), this::onPutRequest),  // database/put/:key/:value
+								path(segment("node").slash(segment("get")), this::onGetBackupRequest) 		// database/node/get
 								)
 						)
 				);
@@ -99,12 +99,12 @@ public class Router extends AllDirectives {
 	
 	/**
 	 * Handler which search for keys on current node
-	 * Path - /database/get/node
+	 * Path - /database/node/get
 	 * 
 	 * @return Route object
 	 */
 	private Route onGetBackupRequest() {
-		log.debug("Request received on /database/get/node");
+		log.debug("Request received on /database/node/get");
 		final GetterBackupMessage msg = new GetterBackupMessage();
 		return routeGateway(msg);
 	}

@@ -80,7 +80,7 @@ public class PartitionManager extends AbstractActor {
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
         final int key = msg.getEntry().getKey().hashCode() % PARTITION_NUMBER;
         final Reference partition = getCeilingReference(key);
-        log.debug("Partition for key [{}] is [{}]", msg.getEntry().getKey(), partition.getActor().path());
+        log.debug("Partition for key [{}] with hash [{}] is [{}]", msg.getEntry().getKey(), key, partition.getId());
         partition.getActor().tell(new GetPartitionResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
     }
 

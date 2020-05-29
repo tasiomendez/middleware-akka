@@ -1,5 +1,6 @@
 package it.polimi.middleware.akka.node.cluster;
 
+import java.util.Map;
 import java.util.TreeMap;
 
 import akka.actor.AbstractActor;
@@ -18,6 +19,8 @@ import it.polimi.middleware.akka.messages.join.FindSuccessorResponseMessage;
 import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
@@ -147,16 +150,16 @@ public class ClusterManager extends AbstractActor {
      * @param msg find successor request message
      */
     private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
-        log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
-                this.self, this.successor, msg);
+//        log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
+//                this.self, this.successor, msg);
 
         if (isBetween(msg.getRequest(), this.self.getId(), this.successor.getId(), false, true)) {
             // reply directly to the request
-            log.debug("Successor found for requester={}", msg);
+//            log.debug("Successor found for requester={}", msg);
             sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
         } else {
             // forward the message to the successor
-            log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
+//            log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
             this.successor.getActor().forward(msg, getContext());
         }
     }
@@ -287,6 +290,51 @@ public class ClusterManager extends AbstractActor {
             successor.getActor().tell(msg.propagate(), self());
         }
     }
+    
+    /**
+     * If the key is between two entries in the Finger Table, the message is forwarded to the lower entry,
+     * and it is done recursively until the node with the key is reached. In case the key is not in the 
+     * finger table, the message is forwarded to the farthest node.
+     * 
+     * @param msg
+     */
+    private void onGetPartitionGetterRequest(GetPartitionGetterRequestMessage msg) {
+    	final int key = msg.getEntry().getKey().hashCode() % PARTITION_NUMBER;
+    	if (isBetween(key, this.predecessor.getId(), this.self.getId(), false, true)) {
+    		log.debug("Partition with key [{}] found on current node [{}]", msg.getEntry().getKey(), this.self);
+    		getContext().getParent().tell(new GetPartitionGetterResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
+    		return;
+    	}
+    	
+    	final Reference partition = this.getFloorReference(key);
+    	log.debug("Received GetPartitionGetterRequestMessage from [{}] with hash [{}]", sender().path(), key);
+    	if (partition.getId() == this.self.getId()) {
+    		log.debug("Partition with key [{}] not found on finger table. Forwarding message.", msg.getEntry().getKey());
+    		this.getFarthestReference().getActor().forward(msg, getContext());
+    	} else {
+    		log.debug("Partition with key [{}] found on finger table. Forwarding message to [{}].", msg.getEntry().getKey(), partition.getId());
+    		partition.getActor().forward(msg, getContext());
+    	}
+    }
+
+    /**
+     * Searches the {@link PartitionManager#members} {@link TreeMap} for an entry whose key is lower or at most equal
+     * to the given key. Normally the method {@link TreeMap#ceilingEntry(Object)} will return {@code null} if the
+     * requested key is the biggest among the entries of the map, but in a circular ring this is not the expected
+     * behaviour, so the search is repeated starting from the greatest key.
+     *
+     * @param key the {@link Integer} key to look for
+     * @return an entry whose key is lower or at most equal to the given key
+     */
+    private Reference getFloorReference(int key) {
+        final Map.Entry<Integer, Reference> entry = this.fingerTable.floorEntry(key);
+        return (entry == null) ? this.fingerTable.floorEntry(this.fingerTable.lastKey()).getValue() : entry.getValue();
+    }
+    
+    private Reference getFarthestReference() {
+        final Map.Entry<Integer, Reference> entry = this.fingerTable.lowerEntry(this.self.getId());
+        return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
+    }
 
     @Override
     public Receive createReceive() {
@@ -320,6 +368,8 @@ public class ClusterManager extends AbstractActor {
                 .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)
                 .match(GetPartitionResponseMessage.class, this::onGetPartitionResponse)
                 .match(PropagateRequestMessage.class, this::onPropagateRequest)
+                .match(GetPartitionGetterRequestMessage.class, this::onGetPartitionGetterRequest)
+                .match(GetPartitionGetterResponseMessage.class, (msg) -> getContext().getParent().forward(msg, getContext()))
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

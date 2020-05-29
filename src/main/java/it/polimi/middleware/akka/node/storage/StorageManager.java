@@ -6,6 +6,8 @@ import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.api.ReplyMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetterBackupMessage;
@@ -37,6 +39,12 @@ public class StorageManager extends AbstractActor {
         sender().tell(reply, self());
     }
 
+    public void onGetByKey(GetPartitionGetterResponseMessage msg) {
+    	log.debug("Get request for key [{}]", msg.getEntry().getKey());
+        ReplyMessage reply = storage.get(msg.getEntry().getKey());
+        msg.getReplyTo().tell(reply, self());
+    }
+
     public void onGetAll(GetterMessage msg) {
         // TODO
     }
@@ -44,6 +52,11 @@ public class StorageManager extends AbstractActor {
     public void onGetBackupAll(GetterBackupMessage msg) {
         ReplyMessage reply = storage.getAll();
         sender().tell(reply, self());
+    }
+
+    private void onGet(GetterMessage msg) {
+        log.debug("Get request received. Asking for partition.");
+        clusterManager.tell(new GetPartitionGetterRequestMessage(msg, sender()), self());
     }
 
     private void onPut(PutterMessage msg) {
@@ -65,8 +78,10 @@ public class StorageManager extends AbstractActor {
     public Receive createReceive() {
         return receiveBuilder()
 
-                .match(GetterMessage.class, msg -> !msg.isAll(), this::onGetByKey)
+                .match(GetterMessage.class, msg -> !msg.isAll() && storage.contains(msg.getKey()), this::onGetByKey)
+                .match(GetterMessage.class, msg -> !msg.isAll(), this::onGet)
                 .match(GetterMessage.class, msg -> msg.isAll(), this::onGetAll)
+                .match(GetPartitionGetterResponseMessage.class, this::onGetByKey)
                 .match(GetterBackupMessage.class, this::onGetBackupAll)
 
                 .match(PutterMessage.class, this::onPut)
