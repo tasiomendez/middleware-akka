@@ -1,5 +1,10 @@
 package it.polimi.middleware.akka.node.cluster.master;
 
+import java.util.Map;
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.cluster.Cluster;
@@ -11,14 +16,7 @@ import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
-import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
-import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
-
-import java.util.Map;
-import java.util.Random;
-import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The PartitionManager actor belongs to the master node. It is in charge of keeping track of the members in the cluster
@@ -26,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class PartitionManager extends AbstractActor {
 
-    private static final int PARTITION_NUMBER = (int) Math.pow(2, 16);
+    private final int PARTITION_NUMBER = (int) Math.pow(2, 16);
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().getSystem());
@@ -73,10 +71,6 @@ public class PartitionManager extends AbstractActor {
         this.members.remove(id);
     }
 
-    private void onNewSuccessorRequest(NewSuccessorRequestMessage msg) {
-        final Reference entry = getRandomMember();
-        sender().tell(new NewSuccessorResponseMessage(entry), self());
-    }
 
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
         final int key = msg.getEntry().getKey().hashCode() % PARTITION_NUMBER;
@@ -108,11 +102,8 @@ public class PartitionManager extends AbstractActor {
      * @return an entry whose key is greater or at most equal to the given key
      */
     private Reference getCeilingReference(int key) {
-        Map.Entry<Integer, Reference> entry = this.members.ceilingEntry(key);
-        if (entry == null) {
-            entry = this.members.ceilingEntry(0);
-        }
-        return entry.getValue();
+        final Map.Entry<Integer, Reference> entry = this.members.ceilingEntry(key);
+        return (entry == null) ? this.members.ceilingEntry(0).getValue() : entry.getValue();
     }
 
     @Override
@@ -120,8 +111,6 @@ public class PartitionManager extends AbstractActor {
         return receiveBuilder()
                 .match(IdRequestMessage.class, this::onIdRequest)
                 .match(UnreachableMember.class, this::onUnreachableMember)
-
-                .match(NewSuccessorRequestMessage.class, this::onNewSuccessorRequest)
 
                 .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)
 

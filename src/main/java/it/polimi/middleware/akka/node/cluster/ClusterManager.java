@@ -1,5 +1,7 @@
 package it.polimi.middleware.akka.node.cluster;
 
+import java.util.TreeMap;
+
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -20,12 +22,8 @@ import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateRequestMessage;
-import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
-import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
-
-import java.util.TreeMap;
 
 /**
  * The ClusterManager actor is in charge of managing the cluster taking into account if a new node is joined, if a node
@@ -58,8 +56,8 @@ public class ClusterManager extends AbstractActor {
     private ActorRef master = getContext().self();
 
     public ClusterManager() {
-        this.partitionManager = (cluster.selfMember().hasRole("master")) ?
-                getContext().actorOf(PartitionManager.props(), "partitionManager") : null;
+    	this.partitionManager = (cluster.selfMember().hasRole("master")) ? 
+    			getContext().actorOf(PartitionManager.props(), "partitionManager") : null;
     }
 
     /**
@@ -81,11 +79,12 @@ public class ClusterManager extends AbstractActor {
     public static Props props() {
         return Props.create(ClusterManager.class);
     }
-
-    private void initFingerTable() {
-        for (int i = 0; i < FINGER_TABLE_SIZE; i++) {
-            fingerTable.put((self.getId() + (int) Math.pow(2, i)) % PARTITION_NUMBER, this.self);
-        }
+    
+    public void initFingerTable() {
+    	// Initialize finger table		
+    	for (int i = 0; i < FINGER_TABLE_SIZE; i++) {
+    		this.fingerTable.put((self.getId() + (int) Math.pow(2, i)) % PARTITION_NUMBER, this.self);
+    	}
     }
 
     /**
@@ -169,17 +168,17 @@ public class ClusterManager extends AbstractActor {
      * @param msg
      */
     private void onFindSuccessorResponse(FindSuccessorResponseMessage msg) {
-        if (msg.getRequest() == this.self.getId()) {
-            this.successor.update(msg);
+        if (msg.getIdRequest() == this.self.getId()) {
+            this.successor.update(msg.getResponse());
             log.debug("Successor found as {}", this.successor);
-            log.info("Successor updated to {}", this.successor.getActor().path().address());
+            log.info("Successor updated to {}", this.successor.getActor().path());
             if (!this.heartbeat.started()) {
                 this.heartbeat.start(this::heartbeat);
             }
         }
 
-        if (fingerTable.containsKey(msg.getRequest())) {
-            fingerTable.put(msg.getRequest(), msg);
+        if (fingerTable.containsKey(msg.getIdRequest())) {
+            fingerTable.put(msg.getIdRequest(), msg.getResponse());
         }
     }
 
@@ -201,13 +200,13 @@ public class ClusterManager extends AbstractActor {
      * @param msg predecessor response message
      */
     private void onGetPredecessorResponse(GetPredecessorResponseMessage msg) {
-        int successorPredecessorId = msg.getId();
+        int successorPredecessorId = msg.getPredecessor().getId();
         // if the `predecessor of the successor` is between the node id and the successor id
         // then update the successor
-        if (!msg.isNull() &&
+        if (!msg.getPredecessor().isNull() &&
                 isBetween(successorPredecessorId, this.self.getId(), this.successor.getId(), false, false)) {
             log.debug("Successor updated: [{}] -> [{}]", this.successor.getId(), successorPredecessorId);
-            this.successor.update(msg);
+            this.successor.update(msg.getPredecessor());
             log.info("Successor updated to {}", this.successor.getActor().path().address());
         }
         // notify the successor of the presence of this node
@@ -222,11 +221,11 @@ public class ClusterManager extends AbstractActor {
      * @param msg notification message
      */
     private void onNotify(NotifyMessage msg) {
-        log.debug("Received notification from predecessor {}", msg);
-        if (this.predecessor.isNull() || isBetween(msg.getId(), this.predecessor.getId(), this.self.getId(), false, false)) {
+        log.debug("Received notification from predecessor {}", msg.getSender());
+        if (this.predecessor.isNull() || isBetween(msg.getSender().getId(), this.predecessor.getId(), this.self.getId(), false, false)) {
             log.debug("Predecessor updated: [{}] -> [{}]",
-                    this.predecessor.getId() == -1 ? "null" : this.predecessor.getId(), msg.getId());
-            this.predecessor.update(msg);
+                    this.predecessor.getId() == -1 ? "null" : this.predecessor.getId(), msg.getSender().getId());
+            this.predecessor.update(msg.getSender());
             log.info("Predecessor updated to {}", this.predecessor.getActor().path().address());
         }
     }
@@ -244,7 +243,7 @@ public class ClusterManager extends AbstractActor {
 
         if (this.successor.getActor().path().address().equals(msg.member().address())) {
             log.info("Successor detected as unreachable. Trying to find the new one");
-            this.master.tell(new NewSuccessorRequestMessage(this.self), self());
+            this.successor.update(this.fingerTable.higherEntry(this.successor.getId()).getValue());
         }
 
         if (this.predecessor.getActor().path().address().equals(msg.member().address())) {
@@ -252,16 +251,6 @@ public class ClusterManager extends AbstractActor {
             this.predecessor.update(Reference.empty());
         }
 
-    }
-
-    /**
-     * Handles a {@link NewSuccessorRequestMessage} when a new successor reference is required to the master node.
-     *
-     * @param msg new successor response message.
-     */
-    private void onNewSuccessorResponse(NewSuccessorResponseMessage msg) {
-        log.info("New successor provided from {}", sender());
-        this.successor.update(msg);
     }
 
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
@@ -316,10 +305,6 @@ public class ClusterManager extends AbstractActor {
                 .match(NotifyMessage.class, this::onNotify)
 
                 .match(UnreachableMember.class, this::onUnreachableMember)
-                .match(NewSuccessorRequestMessage.class,
-                        () -> cluster.selfMember().hasRole("master"),
-                        (msg) -> partitionManager.forward(msg, getContext()))
-                .match(NewSuccessorResponseMessage.class, this::onNewSuccessorResponse)
 
                 // Storage messages
                 .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)
