@@ -1,8 +1,5 @@
 package it.polimi.middleware.akka.node.cluster;
 
-import java.util.Map;
-import java.util.TreeMap;
-
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -21,6 +18,8 @@ import it.polimi.middleware.akka.messages.join.FindSuccessorResponseMessage;
 import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
+import it.polimi.middleware.akka.messages.join.MoveStorageMessage;
+import it.polimi.middleware.akka.messages.join.MoveStorageRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GathererMessage;
 import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
@@ -34,6 +33,9 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * The ClusterManager actor is in charge of managing the cluster taking into account if a new node is joined, if a node
@@ -80,7 +82,7 @@ public class ClusterManager extends AbstractActor {
      * @param inclusiveUpper include upper limit if true
      * @return true if is between, false otherwise
      */
-    private static boolean isBetween(int id, int lowerBound, int upperBound, boolean inclusiveLower, boolean inclusiveUpper) {
+    public static boolean isBetween(int id, int lowerBound, int upperBound, boolean inclusiveLower, boolean inclusiveUpper) {
         boolean checkLower = inclusiveLower ? id >= lowerBound : id > lowerBound;
         boolean checkUpper = inclusiveUpper ? id <= upperBound : id < upperBound;
         return (checkLower && checkUpper) || (upperBound <= lowerBound && (checkLower || checkUpper));
@@ -242,10 +244,16 @@ public class ClusterManager extends AbstractActor {
     private void onNotify(NotifyMessage msg) {
         log.debug("Received notification from predecessor {}", msg.getSender());
         if (this.predecessor.isNull() || isBetween(msg.getSender().getId(), this.predecessor.getId(), this.self.getId(), false, false)) {
-            log.debug("Predecessor updated: [{}] -> [{}]",
-                    this.predecessor.getId() == -1 ? "null" : this.predecessor.getId(), msg.getSender().getId());
+            final Reference oldPredecessor = this.predecessor.copy();
             this.predecessor.update(msg.getSender());
-            log.info("Predecessor updated to {}", this.predecessor.getActor().path().address());
+            log.debug("Predecessor updated: [{}] -> [{}]", oldPredecessor, this.predecessor);
+
+            if (this.self.equals(this.predecessor)) {
+                return;
+            }
+
+            final Object message = new MoveStorageMessage(this.predecessor.getActor(), oldPredecessor.getId(), this.predecessor.getId());
+            getContext().getParent().tell(message, self());
         }
     }
 
@@ -406,6 +414,8 @@ public class ClusterManager extends AbstractActor {
                         () -> cluster.selfMember().hasRole("master"),
                         (msg) -> partitionManager.forward(msg, getContext()))
                 .match(IdResponseMessage.class, this::onIdResponse)
+
+                .match(MoveStorageRequestMessage.class, msg -> getContext().parent().forward(msg, getContext()))
 
                 .match(FindSuccessorRequestMessage.class, this::onFindSuccessorRequest)
                 .match(FindSuccessorResponseMessage.class, 

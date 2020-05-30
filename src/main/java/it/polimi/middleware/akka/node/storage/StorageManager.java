@@ -1,14 +1,13 @@
 package it.polimi.middleware.akka.node.storage;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.api.ReplyMessage;
+import it.polimi.middleware.akka.messages.join.MoveStorageMessage;
+import it.polimi.middleware.akka.messages.join.MoveStorageRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
@@ -19,6 +18,9 @@ import it.polimi.middleware.akka.messages.storage.GetterMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PutterMessage;
 import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Actor in charge of managing data partitions. When data partition is needed to be updated, it handles all the
@@ -37,6 +39,18 @@ public class StorageManager extends AbstractActor {
 
     public static Props props(ActorRef clusterManager) {
         return Props.create(StorageManager.class, clusterManager);
+    }
+
+    private void onMoveStorage(MoveStorageMessage msg) {
+        final Map<String, String> move = this.storage.getPartition(msg.getFromKey(), msg.getToKey());
+        this.storage.addAllToPartition(msg.getDestination().path().address(), move);
+        log.debug("Moving [{}] to {}", move, msg.getDestination());
+        msg.getDestination().tell(new MoveStorageRequestMessage(move), self());
+    }
+
+    private void onMoveStorageRequest(MoveStorageRequestMessage msg) {
+        this.storage.move(msg.getMove());
+        log.debug("Imported storage [{}] from {}", msg.getMove(), sender());
     }
 
     public void onGetByKey(GetterMessage msg) {
@@ -100,6 +114,9 @@ public class StorageManager extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
+
+                .match(MoveStorageMessage.class, this::onMoveStorage)
+                .match(MoveStorageRequestMessage.class, this::onMoveStorageRequest)
 
                 .match(GetterMessage.class, msg -> !msg.isAll() && storage.contains(msg.getKey()), this::onGetByKey)
                 .match(GetterMessage.class, msg -> !msg.isAll(), this::onGet)

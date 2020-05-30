@@ -11,6 +11,8 @@ import java.util.Objects;
  */
 public class Reference implements Serializable {
 
+    public static final int ID_NULL = -1;
+
     private static final long serialVersionUID = 1L;
 
     private Integer id;
@@ -50,16 +52,20 @@ public class Reference implements Serializable {
     }
 
     public final Integer getId() {
-        return id == null ? -1 : id;
+        return id == null ? ID_NULL : id;
     }
 
     public final ActorRef getActor() {
         return actor;
     }
 
+    public final Reference copy() {
+        return new Reference(this);
+    }
+
     @Override
-    public String toString() {
-        return "Node[" + (id == null ? "null" : id) + "]";
+    public int hashCode() {
+        return Objects.hash(id, actor);
     }
 
     @Override
@@ -72,7 +78,7 @@ public class Reference implements Serializable {
     }
 
     @Override
-    public int hashCode() {
-        return Objects.hash(id, actor);
+    public String toString() {
+        return "Node[" + (id == null ? "null" : id) + "]";
     }
 }

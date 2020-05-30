@@ -1,7 +1,5 @@
 package it.polimi.middleware.akka.node.storage;
 
-import java.util.HashMap;
-
 import akka.actor.ActorSystem;
 import akka.actor.Address;
 import akka.cluster.Cluster;
@@ -11,6 +9,10 @@ import akka.http.javadsl.model.StatusCodes;
 import it.polimi.middleware.akka.messages.api.ErrorMessage;
 import it.polimi.middleware.akka.messages.api.ReplyMessage;
 import it.polimi.middleware.akka.messages.api.SuccessMessage;
+import it.polimi.middleware.akka.node.cluster.ClusterManager;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class Storage {
 
@@ -18,15 +20,18 @@ public class Storage {
 	private final LoggingAdapter log;
 	private final Cluster cluster;
 
+	private final int partitionNumber;
+
 	private static Storage instance; 
 
 	private HashMap<String, String> storage = new HashMap<>();
 	private HashMap<Address, HashMap<String, String>> backup = new HashMap<>();
 	
-	private Storage(ActorSystem system) { 
+	private Storage(ActorSystem system) {
 		this.system = system;
 		this.log = Logging.getLogger(this.system, this);
 		this.cluster = Cluster.get(this.system);
+		this.partitionNumber = system.settings().config().getInt("clustering.partition.max");
 	}
 	
 	/**
@@ -70,6 +75,14 @@ public class Storage {
 			return new SuccessMessage(key, value, address);
 		} catch (Exception e) {
 			return new ErrorMessage(e);
+		}
+	}
+
+	public void move(Map<String, String> move) {
+		for (Map.Entry<String, String> entry : move.entrySet()) {
+			if (!this.storage.containsKey(entry.getKey())) {
+				this.storage.put(entry.getKey(), entry.getValue());
+			}
 		}
 	}
 	
@@ -125,6 +138,17 @@ public class Storage {
 			return new ErrorMessage(e);
 		}
 	}
+
+	public Map<String, String> getPartition(int fromKey, int toKey) {
+		final Map<String, String> result = new HashMap<>();
+		for (Map.Entry<String, String> entry : this.storage.entrySet()) {
+			final int key = Math.abs(entry.getKey().hashCode() % partitionNumber);
+			if (ClusterManager.isBetween(key, fromKey, toKey, false, true)) {
+				result.put(entry.getKey(), entry.getValue());
+			}
+		}
+		return result;
+	}
 	
 	/**
 	 * Add a new partition to the backup from an existing node.
@@ -138,6 +162,12 @@ public class Storage {
 		if (!this.backup.containsKey(address))
 			this.backup.put(address, new HashMap<String, String>());
 		return this.backup.get(address).put(entry.getKey(), entry.getValue());
+	}
+
+	public void addAllToPartition(Address address, Map<String,String> map) {
+		if (!this.backup.containsKey(address))
+			this.backup.put(address, new HashMap<>());
+		this.backup.get(address).putAll(map);
 	}
 	
 	/**

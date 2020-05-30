@@ -6,6 +6,8 @@ import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
+import it.polimi.middleware.akka.messages.join.MoveStorageMessage;
+import it.polimi.middleware.akka.messages.join.MoveStorageRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
@@ -34,6 +36,9 @@ public class Node extends AbstractActor {
         return receiveBuilder()
 
                 .match(MasterNotificationMessage.class, msg -> clusterManager.forward(msg, getContext()))
+
+                .match(MoveStorageMessage.class, msg -> storageManager.forward(msg, getContext()))
+                .match(MoveStorageRequestMessage.class, msg -> storageManager.forward(msg, getContext()))
 
                 .match(PropagateMessage.class, msg -> storageManager.forward(msg, getContext()))
                 .match(GetPartitionResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
