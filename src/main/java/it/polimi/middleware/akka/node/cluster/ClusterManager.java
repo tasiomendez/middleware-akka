@@ -5,7 +5,6 @@ import java.util.TreeMap;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.actor.Address;
 import akka.actor.Props;
 import akka.cluster.Cluster;
 import akka.cluster.ClusterEvent.MemberRemoved;
@@ -31,6 +30,8 @@ import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateRequestMessage;
 import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
+import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
+import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
 
@@ -164,12 +165,9 @@ public class ClusterManager extends AbstractActor {
 //            log.debug("Successor found for requester={}", msg);
             sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
         } else {
-            final Reference nextNode = this.closetPrecedingNode(msg.getRequest());
-            if (nextNode.equals(this.self)) {
-                sender().tell(new FindSuccessorResponseMessage(this.self, msg.getRequest()), self());
-                return;
-            }
-            nextNode.getActor().forward(msg, getContext());
+            // forward the message to the successor
+//            log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
+            this.successor.getActor().forward(msg, getContext());
         }
     }
 
@@ -261,16 +259,25 @@ public class ClusterManager extends AbstractActor {
         
         if (this.successor.getActor().path().address().equals(msg.member().address())) {
         	log.info("Successor detected as unreachable. Trying to find the new one");
-        	this.successor.update(this.higherEntry(this.successor.getId()));
+            this.master.tell(new NewSuccessorRequestMessage(this.self), self());
         }
 
         if (this.predecessor.getActor().path().address().equals(msg.member().address())) {
         	log.info("Predecessor detected as unreachable. Trying to find the new one");
         	this.predecessor.update(Reference.empty());
-        	
         }
     }
-    
+
+    /**
+     * Handles a {@link NewSuccessorRequestMessage} when a new successor reference is required to the master node.
+     *
+     * @param msg new successor response message.
+     */
+    private void onNewSuccessorResponse(NewSuccessorResponseMessage msg) {
+    	log.info("New successor provided from {}", sender());
+    	this.successor.update(msg);
+    }
+
     /**
      * Handles an {@link MemberRemoved} message. When the member is removed from the cluster, the data it stored
      * is replicated into a new node.
@@ -357,11 +364,6 @@ public class ClusterManager extends AbstractActor {
         final Map.Entry<Integer, Reference> entry = this.fingerTable.lowerEntry(this.self.getId());
         return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
     }
-
-    private Reference closetPrecedingNode(int id) {
-        final Map.Entry<Integer, Reference> entry = fingerTable.lowerEntry(id);
-        return (entry == null) ? this.fingerTable.lowerEntry(PARTITION_NUMBER).getValue() : entry.getValue();
-    }
     
     private Reference higherEntry(int key) {
         final Map.Entry<Integer, Reference> entry = this.fingerTable.higherEntry(key);
@@ -412,6 +414,10 @@ public class ClusterManager extends AbstractActor {
                 .match(NotifyMessage.class, this::onNotify)
 
                 .match(UnreachableMember.class, this::onUnreachableMember)
+                .match(NewSuccessorRequestMessage.class,
+                        () -> cluster.selfMember().hasRole("master"),
+                        (msg) -> partitionManager.forward(msg, getContext()))
+                .match(NewSuccessorResponseMessage.class, this::onNewSuccessorResponse)
                 .match(MemberRemoved.class, this::onMemberRemoved)
 
                 // Storage messages

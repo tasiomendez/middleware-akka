@@ -86,9 +86,14 @@ public class StorageManager extends AbstractActor {
     
     public void onRestoreRequest(RestoreRequestMessage msg) {
     	log.info("Restoring lost data from unreachable node");
-    	HashMap<String, String> restores = storage.removePartition(msg.getAddress());
+    	if (storage.containsPartition(msg.getAddress()))
+    		storage.restore(msg.getAddress());
+    	/*HashMap<String, String> restores = storage.removePartition(msg.getAddress());
     	for (Map.Entry<String, String> entry : restores.entrySet()) {
-    		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry.getKey(), entry.getValue()), sender()), self());
+    		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry), sender()), self());
+    	}*/
+    	for (Map.Entry<String, String> entry : storage.getAll().entrySet()) {
+    		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry), sender()), self());
     	}
     }
 
@@ -110,7 +115,8 @@ public class StorageManager extends AbstractActor {
 
                 .match(GathererStorageMessage.class, this::onGathererStorage)
 
-                .match(RestoreRequestMessage.class, (msg) -> storage.containsPartition(msg.getAddress()), this::onRestoreRequest)
+                //.match(RestoreRequestMessage.class, (msg) -> storage.containsPartition(msg.getAddress()), this::onRestoreRequest)
+                .match(RestoreRequestMessage.class, this::onRestoreRequest)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();
