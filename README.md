@@ -19,6 +19,7 @@ There are three endpoints which can be used to get, add or update the objects st
 | `/database/get` | GET | Returns all the keys stored in the database. |
 | `/database/get/:key` | GET | Returns the value associated to `:key`. |
 | `/database/put/:key/:value` | GET | Adds a new entry with key `:key` and value `:value`. |
+| `/database/node/get` | GET | Returns the keys stored on the current node. |
 
 ### AkkaManagement
 
@@ -68,3 +69,5 @@ Some environment variables are provided to have a minimum configuration for the 
 | `AKKA_CLUSTER_SEED_PORT` | 2552          | The port of the node to join automatically at startup. |
 | `AKKA_SERVER_PORT`       | 8080          | The port where the http server listens to. |
 | `AKKA_SERVER_MANAGEMENT` | true          |Enable the api management of the cluster.  |
+| `AKKA_CLUSTER_PARTITION_NUMBER`   | 2E16       | Number maximum of nodes in the cluster. It must be the same for all of them. |
+| `AKKA_CLUSTER_REPLICATION_NUMBER` | 2          | Replication factor. It makes the system tolerates up to `R-1` failures. |
