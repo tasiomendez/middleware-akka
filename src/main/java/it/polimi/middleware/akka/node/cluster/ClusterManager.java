@@ -157,18 +157,21 @@ public class ClusterManager extends AbstractActor {
      * @param msg find successor request message
      */
     private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
-//        log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
-//                this.self, this.successor, msg);
+    	// log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
+    	//		this.self, this.successor, msg);
 
-        if (isBetween(msg.getRequest(), this.self.getId(), this.successor.getId(), false, true)) {
-            // reply directly to the request
-//            log.debug("Successor found for requester={}", msg);
-            sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
-        } else {
-            // forward the message to the successor
-//            log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
-            this.successor.getActor().forward(msg, getContext());
-        }
+    	if (isBetween(msg.getRequest(), this.self.getId(), this.successor.getId(), false, true)) {
+    		// reply directly to the request
+    		// log.debug("Successor found for requester={}", msg);
+    		sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
+    	} else {
+    		final Reference nextNode = this.closetPrecedingNode(msg.getRequest());
+    		if (nextNode.equals(this.self)) {
+    			sender().tell(new FindSuccessorResponseMessage(this.self, msg.getRequest()), self());
+    			return;
+    		}
+    		nextNode.getActor().forward(msg, getContext());
+    	}
     }
 
     /**
@@ -363,6 +366,11 @@ public class ClusterManager extends AbstractActor {
     private Reference getFarthestReference() {
         final Map.Entry<Integer, Reference> entry = this.fingerTable.lowerEntry(this.self.getId());
         return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
+    }
+
+    private Reference closetPrecedingNode(int id) {
+        final Map.Entry<Integer, Reference> entry = fingerTable.lowerEntry(id);
+        return (entry == null) ? this.fingerTable.lowerEntry(PARTITION_NUMBER).getValue() : entry.getValue();
     }
     
     private Reference higherEntry(int key) {
