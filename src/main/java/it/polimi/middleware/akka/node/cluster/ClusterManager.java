@@ -11,6 +11,7 @@ import akka.cluster.ClusterEvent.UnreachableMember;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
+import it.polimi.middleware.akka.messages.api.SuccessMessage;
 import it.polimi.middleware.akka.messages.heartbeat.GetPredecessorRequestMessage;
 import it.polimi.middleware.akka.messages.heartbeat.GetPredecessorResponseMessage;
 import it.polimi.middleware.akka.messages.heartbeat.NotifyMessage;
@@ -19,6 +20,8 @@ import it.polimi.middleware.akka.messages.join.FindSuccessorResponseMessage;
 import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
+import it.polimi.middleware.akka.messages.storage.GathererMessage;
+import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
@@ -335,6 +338,23 @@ public class ClusterManager extends AbstractActor {
         final Map.Entry<Integer, Reference> entry = this.fingerTable.lowerEntry(this.self.getId());
         return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
     }
+    
+    private void onGathererStorage(GathererStorageMessage msg) {
+    	log.debug("Forwarding GathererMessage to successor");
+    	final Reference originator = (msg.getOriginator() != null) ? msg.getOriginator() : this.self;
+    	final GathererMessage gatherer = new GathererMessage(msg.getAccumulator(), originator, msg.getReplyTo());
+    	this.successor.getActor().tell(gatherer, self());
+    }
+    
+    private void onGatherer(GathererMessage msg) {
+    	if (msg.getOriginator().equals(this.self)) {
+    		log.debug("Gatherer loop finished. Sending http response");
+    		msg.getReplyTo().tell(new SuccessMessage(msg.getAccumulator()), self());
+    	} else {
+	    	log.debug("Gatherer message recived with originator [{}]", msg.getOriginator().getId());
+	    	getContext().getParent().tell(new GathererStorageMessage(msg), self());
+    	}
+    }
 
     @Override
     public Receive createReceive() {
@@ -370,6 +390,8 @@ public class ClusterManager extends AbstractActor {
                 .match(PropagateRequestMessage.class, this::onPropagateRequest)
                 .match(GetPartitionGetterRequestMessage.class, this::onGetPartitionGetterRequest)
                 .match(GetPartitionGetterResponseMessage.class, (msg) -> getContext().getParent().forward(msg, getContext()))
+                .match(GathererStorageMessage.class, this::onGathererStorage)
+                .match(GathererMessage.class, this::onGatherer)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

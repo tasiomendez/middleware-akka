@@ -6,6 +6,7 @@ import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.api.ReplyMessage;
+import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
@@ -45,12 +46,8 @@ public class StorageManager extends AbstractActor {
         msg.getReplyTo().tell(reply, self());
     }
 
-    public void onGetAll(GetterMessage msg) {
-        // TODO
-    }
-
     public void onGetBackupAll(GetterBackupMessage msg) {
-        ReplyMessage reply = storage.getAll();
+        ReplyMessage reply = storage.getNodeAll();
         sender().tell(reply, self());
     }
 
@@ -74,6 +71,15 @@ public class StorageManager extends AbstractActor {
         storage.addToPartition(msg.getAddress(), msg.getEntry().toHashMapEntry());
     }
 
+    public void onGetAll(GetterMessage msg) {
+        log.debug("Get request received for all keys. Starting loop...");
+        clusterManager.tell(new GathererStorageMessage(storage.getAll(), sender()), self());
+    }
+    
+    public void onGathererStorage(GathererStorageMessage msg) {
+    	sender().tell(msg.sum(this.storage.getAll()), self());
+    }
+
     @Override
     public Receive createReceive() {
         return receiveBuilder()
@@ -89,6 +95,8 @@ public class StorageManager extends AbstractActor {
                 .match(PropagateMessage.class, this::onPropagateMessage)
 
                 .match(GetPartitionResponseMessage.class, this::onGetPartitionResponse)
+
+                .match(GathererStorageMessage.class, this::onGathererStorage)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

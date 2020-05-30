@@ -28,6 +28,11 @@ public class SuccessMessage extends ReplyMessage {
 		this.node = node;
 	}
 	
+	public SuccessMessage(HashMap<String, String> storage) {
+		super(StatusCodes.ACCEPTED, "OK");
+		this.storage = storage;
+	}
+	
 	public SuccessMessage(HashMap<String, String> storage, HashMap<Address, HashMap<String, String>> backup) {
 		super(StatusCodes.ACCEPTED, "OK");
 		this.storage = storage;

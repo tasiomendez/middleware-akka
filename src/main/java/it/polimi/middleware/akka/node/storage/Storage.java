@@ -104,11 +104,20 @@ public class Storage {
 	}
 	
 	/**
+	 * Get all keys from the main memory
+	 * 
+	 * @return HashMap
+	 */
+	public HashMap<String, String> getAll() {
+		return this.storage;
+	}
+	
+	/**
 	 * Get all keys and values stored in the current node.
 	 * 
 	 * @return reply message
 	 */
-	public ReplyMessage getAll() {
+	public ReplyMessage getNodeAll() {
 		try {
 			log.info("Get request received for all keys");
 			return new SuccessMessage(this.storage, this.backup);
