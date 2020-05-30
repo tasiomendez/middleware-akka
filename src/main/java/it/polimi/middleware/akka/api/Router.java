@@ -22,7 +22,7 @@ public class Router extends AllDirectives {
 	private Route[] imports = {};
 	
 	// Timeout for discarding a request
-	private static final Duration timeout = Duration.ofSeconds(5);
+	private static final Duration timeout = Duration.ofSeconds(10);
 	
 	private static Router instance;
 	private ActorSystem system;
