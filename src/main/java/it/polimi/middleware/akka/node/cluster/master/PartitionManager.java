@@ -15,6 +15,8 @@ import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
+import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
+import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 
 /**
@@ -70,15 +72,19 @@ public class PartitionManager extends AbstractActor {
     }
 
     private void onUnreachableMember(UnreachableMember msg) {
-        cluster.down(msg.member().address());
-        log.info("Member {} marked as down", msg.member().address());
-        final int id = this.ids.remove(msg.member().address().hashCode());
-        this.members.remove(id);
+    	cluster.down(msg.member().address());
+    	log.info("Member {} marked as down", msg.member().address());
+    	final int id = this.ids.remove(msg.member().address().hashCode());
+    	this.members.remove(id);
     }
 
+    private void onNewSuccessorRequest(NewSuccessorRequestMessage msg) {
+    	final Reference entry = getRandomMember();
+    	sender().tell(new NewSuccessorResponseMessage(entry), self());
+    }
 
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
-        final int key = Math.abs(msg.getEntry().getKey().hashCode() % PARTITION_NUMBER);
+    	final int key = Math.abs(msg.getEntry().getKey().hashCode() % PARTITION_NUMBER);
         final Reference partition = getCeilingReference(key);
         log.debug("Partition for key [{}] with hash [{}] is [{}]", msg.getEntry().getKey(), key, partition.getId());
         partition.getActor().tell(new GetPartitionResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
@@ -116,6 +122,8 @@ public class PartitionManager extends AbstractActor {
         return receiveBuilder()
                 .match(IdRequestMessage.class, this::onIdRequest)
                 .match(UnreachableMember.class, this::onUnreachableMember)
+                
+                .match(NewSuccessorRequestMessage.class, this::onNewSuccessorRequest)
 
                 .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)
 

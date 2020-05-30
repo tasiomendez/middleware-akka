@@ -3,6 +3,7 @@ package it.polimi.middleware.akka.messages.storage;
 import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.HashMap;
+import java.util.Map;
 
 public class PutterMessage implements Serializable {
 
@@ -14,6 +15,11 @@ public class PutterMessage implements Serializable {
 	public PutterMessage(String key, String value) {
 		this.key = key;
 		this.value = value;
+	}
+	
+	public PutterMessage(Map.Entry<String, String> entry) {
+		this.key = entry.getKey();
+		this.value = entry.getValue();
 	}
 
 	public final String getKey() {
