@@ -64,6 +64,9 @@ public class ClusterListener extends AbstractActor {
 		if (msg.member().hasRole("master")) {
 			log.error("Master Node detected as Unreachable. Shutting down system.");
 			getContext().getSystem().terminate();
+		} else {
+			// Send message to ClusterManager
+			getContext().getParent().tell(msg, self());
 		}
 	}
 

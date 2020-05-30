@@ -10,6 +10,7 @@ import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
+import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
 import it.polimi.middleware.akka.node.cluster.ClusterManager;
 import it.polimi.middleware.akka.node.storage.Storage;
 import it.polimi.middleware.akka.node.storage.StorageManager;
@@ -39,6 +40,8 @@ public class Node extends AbstractActor {
                 .match(GetPartitionGetterResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
 
                 .match(GathererStorageMessage.class, msg -> storageManager.forward(msg, getContext()))
+
+                .match(RestoreRequestMessage.class, msg -> storageManager.forward(msg, getContext()))
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

@@ -1,5 +1,8 @@
 package it.polimi.middleware.akka.node.storage;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -15,6 +18,7 @@ import it.polimi.middleware.akka.messages.storage.GetterBackupMessage;
 import it.polimi.middleware.akka.messages.storage.GetterMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PutterMessage;
+import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
 
 /**
  * Actor in charge of managing data partitions. When data partition is needed to be updated, it handles all the
@@ -79,6 +83,14 @@ public class StorageManager extends AbstractActor {
     public void onGathererStorage(GathererStorageMessage msg) {
     	sender().tell(msg.sum(this.storage.getAll()), self());
     }
+    
+    public void onRestoreRequest(RestoreRequestMessage msg) {
+    	log.info("Restoring lost data from unreachable node");
+    	HashMap<String, String> restores = storage.removePartition(msg.getAddress());
+    	for (Map.Entry<String, String> entry : restores.entrySet()) {
+    		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry.getKey(), entry.getValue()), sender()), self());
+    	}
+    }
 
     @Override
     public Receive createReceive() {
@@ -97,6 +109,8 @@ public class StorageManager extends AbstractActor {
                 .match(GetPartitionResponseMessage.class, this::onGetPartitionResponse)
 
                 .match(GathererStorageMessage.class, this::onGathererStorage)
+
+                .match(RestoreRequestMessage.class, (msg) -> storage.containsPartition(msg.getAddress()), this::onRestoreRequest)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

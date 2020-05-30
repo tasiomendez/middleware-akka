@@ -5,8 +5,10 @@ import java.util.TreeMap;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.actor.Address;
 import akka.actor.Props;
 import akka.cluster.Cluster;
+import akka.cluster.ClusterEvent.MemberRemoved;
 import akka.cluster.ClusterEvent.UnreachableMember;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -28,6 +30,7 @@ import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateRequestMessage;
+import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
 
@@ -243,7 +246,7 @@ public class ClusterManager extends AbstractActor {
     }
 
     /**
-     * Handles an {@link UnreachableMember} message. If the member detected as unreachable is my successor or
+     * Handles an {@link UnreachableMember} message. If the member detected as removed is my successor or
      * predecessor, a new search needs to be performed. The master node will forward the message to the {@link
      * PartitionManager} in order to mark it as down.
      *
@@ -252,17 +255,30 @@ public class ClusterManager extends AbstractActor {
     private void onUnreachableMember(UnreachableMember msg) {
         if (cluster.selfMember().hasRole("master"))
             partitionManager.forward(msg, getContext());
-
+        
         if (this.successor.getActor().path().address().equals(msg.member().address())) {
-            log.info("Successor detected as unreachable. Trying to find the new one");
-            this.successor.update(this.fingerTable.higherEntry(this.successor.getId()).getValue());
+        	log.info("Successor detected as unreachable. Trying to find the new one");
+        	this.successor.update(this.higherEntry(this.successor.getId()));
         }
 
         if (this.predecessor.getActor().path().address().equals(msg.member().address())) {
-            log.info("Predecessor detected as unreachable. Trying to find the new one");
-            this.predecessor.update(Reference.empty());
+        	log.info("Predecessor detected as unreachable. Trying to find the new one");
+        	this.predecessor.update(Reference.empty());
+        	
         }
-
+    }
+    
+    /**
+     * Handles an {@link MemberRemoved} message. When the member is removed from the cluster, the data it stored
+     * is replicated into a new node.
+     * 
+     * @param msg member removed
+     */
+    private void onMemberRemoved(MemberRemoved msg) {
+    	this.heartbeat.execute(() -> {
+    		// Restore keys from the unreachable member
+    		getContext().getParent().tell(new RestoreRequestMessage(msg.member().address()), self());
+    	}, 2);
     }
 
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
@@ -339,6 +355,11 @@ public class ClusterManager extends AbstractActor {
         return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
     }
     
+    private Reference higherEntry(int key) {
+        final Map.Entry<Integer, Reference> entry = this.fingerTable.higherEntry(key);
+        return (entry == null) ? this.fingerTable.firstEntry().getValue() : entry.getValue();
+    }
+    
     private void onGathererStorage(GathererStorageMessage msg) {
     	log.debug("Forwarding GathererMessage to successor");
     	final Reference originator = (msg.getOriginator() != null) ? msg.getOriginator() : this.self;
@@ -383,6 +404,7 @@ public class ClusterManager extends AbstractActor {
                 .match(NotifyMessage.class, this::onNotify)
 
                 .match(UnreachableMember.class, this::onUnreachableMember)
+                .match(MemberRemoved.class, this::onMemberRemoved)
 
                 // Storage messages
                 .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)

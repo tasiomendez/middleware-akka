@@ -152,6 +152,16 @@ public class Storage {
 	}
 	
 	/**
+	 * Check if an existing backup of an address exists.
+	 * 
+	 * @param address address of the backup node
+	 * @return true if it contains, otherwise false 
+	 */
+	public boolean containsPartition(Address address) {
+		return this.backup.containsKey(address);
+	}
+	
+	/**
 	 * Remove an existing partition from the backup of an existing node.
 	 * 
 	 * @param address address of the backup node

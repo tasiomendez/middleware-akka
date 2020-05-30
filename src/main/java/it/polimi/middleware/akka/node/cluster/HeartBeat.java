@@ -63,6 +63,31 @@ public class HeartBeat {
                 this.system.dispatcher());
         this.started = true;
 	}
+	
+	/**
+	 * Execute a function on the next loop of the heartbeat.
+	 *  
+	 * @param runnable
+	 */
+	public void execute(Runnable runnable) {
+		this.system.scheduler().scheduleOnce(
+				INITIAL_DELAY, 
+				runnable, 
+				this.system.dispatcher());
+	}
+	
+	/**
+	 * Execute a function on the next loop of the heartbeat by
+	 * by delaying the number of steps given.
+	 *  
+	 * @param runnable
+	 */
+	public void execute(Runnable runnable, int offset) {
+		this.system.scheduler().scheduleOnce(
+				INITIAL_DELAY.multipliedBy(offset), 
+				runnable, 
+				this.system.dispatcher());
+	}
 
 	public boolean started() {
 		return this.started;
