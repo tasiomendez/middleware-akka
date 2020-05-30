@@ -257,12 +257,12 @@ public class ClusterManager extends AbstractActor {
         if (cluster.selfMember().hasRole("master"))
             partitionManager.forward(msg, getContext());
         
-        if (this.successor.getActor().path().address().equals(msg.member().address())) {
+        if (!this.successor.isNull() && this.successor.getActor().path().address().equals(msg.member().address())) {
         	log.info("Successor detected as unreachable. Trying to find the new one");
             this.master.tell(new NewSuccessorRequestMessage(this.self), self());
         }
 
-        if (this.predecessor.getActor().path().address().equals(msg.member().address())) {
+        if (!this.predecessor.isNull() && this.predecessor.getActor().path().address().equals(msg.member().address())) {
         	log.info("Predecessor detected as unreachable. Trying to find the new one");
         	this.predecessor.update(Reference.empty());
         }
