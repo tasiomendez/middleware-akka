@@ -302,7 +302,7 @@ public class ClusterManager extends AbstractActor {
      * @param msg
      */
     private void onGetPartitionGetterRequest(GetPartitionGetterRequestMessage msg) {
-    	final int key = msg.getEntry().getKey().hashCode() % PARTITION_NUMBER;
+    	final int key = Math.abs(msg.getEntry().getKey().hashCode() % PARTITION_NUMBER);
     	if (isBetween(key, this.predecessor.getId(), this.self.getId(), false, true)) {
     		log.debug("Partition with key [{}] found on current node [{}]", msg.getEntry().getKey(), this.self);
     		getContext().getParent().tell(new GetPartitionGetterResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
