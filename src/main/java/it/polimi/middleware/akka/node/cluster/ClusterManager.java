@@ -35,6 +35,9 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
 
+import java.util.Map;
+import java.util.TreeMap;
+
 /**
  * The ClusterManager actor is in charge of managing the cluster taking into account if a new node is joined, if a node
  * is removed from the cluster and all the changes within it. It is the one in charge of managing the stability between
@@ -165,9 +168,12 @@ public class ClusterManager extends AbstractActor {
 //            log.debug("Successor found for requester={}", msg);
             sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
         } else {
-            // forward the message to the successor
-//            log.debug("Successor not found for requester={}. Forwarding message to successor", msg);
-            this.successor.getActor().forward(msg, getContext());
+            final Reference nextNode = this.closetPrecedingNode(msg.getRequest());
+            if (nextNode.equals(this.self)) {
+                sender().tell(new FindSuccessorResponseMessage(this.self, msg.getRequest()), self());
+                return;
+            }
+            nextNode.getActor().forward(msg, getContext());
         }
     }
 
@@ -364,7 +370,12 @@ public class ClusterManager extends AbstractActor {
         final Map.Entry<Integer, Reference> entry = this.fingerTable.lowerEntry(this.self.getId());
         return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
     }
-    
+
+    private Reference closetPrecedingNode(int id) {
+        final Map.Entry<Integer, Reference> entry = fingerTable.lowerEntry(id);
+        return (entry == null) ? this.fingerTable.lowerEntry(PARTITION_NUMBER).getValue() : entry.getValue();
+    }
+
     private Reference higherEntry(int key) {
         final Map.Entry<Integer, Reference> entry = this.fingerTable.higherEntry(key);
         return (entry == null) ? this.fingerTable.firstEntry().getValue() : entry.getValue();
