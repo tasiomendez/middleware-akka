@@ -1,7 +1,12 @@
 package it.polimi.middleware.akka.node.storage;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.actor.Address;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -15,41 +20,52 @@ import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetterBackupMessage;
 import it.polimi.middleware.akka.messages.storage.GetterMessage;
+import it.polimi.middleware.akka.messages.storage.PropagateBackupMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PutterMessage;
 import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Actor in charge of managing data partitions. When data partition is needed to be updated, it handles all the
  * necessary operations.
  */
 public class StorageManager extends AbstractActor {
+	
+	private static final Duration BACKUP_MAX_TIME_DURATION = Duration.ofSeconds(30);
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Storage storage = Storage.get(getContext().getSystem());
     
     private final ActorRef clusterManager;
     
+    private final ConcurrentHashMap<Address, Long> backups = new ConcurrentHashMap<>();
+    
+    private final Supervisor supervisor = Supervisor.get(getContext().getSystem());
+    
     public StorageManager(ActorRef clusterManager) {
     	this.clusterManager = clusterManager;
+    	log.info("Starting backup supervisor");
+    	this.supervisor.start(this::supervisor);
     }
 
     public static Props props(ActorRef clusterManager) {
         return Props.create(StorageManager.class, clusterManager);
     }
+	
+	private void supervisor() {
+		final PropagateBackupMessage message = new PropagateBackupMessage(storage.getAll());
+		clusterManager.tell(message, self());
+	}
 
     private void onMoveStorage(MoveStorageMessage msg) {
-        final Map<String, String> move = this.storage.getPartition(msg.getFromKey(), msg.getToKey());
-        this.storage.addAllToPartition(msg.getDestination().path().address(), move);
+        final Map<String, String> move = this.storage.getKeySpace(msg.getFromKey(), msg.getToKey());
+        this.storage.remove(move);
         log.debug("Moving [{}] to {}", move, msg.getDestination());
         msg.getDestination().tell(new MoveStorageRequestMessage(move), self());
     }
 
     private void onMoveStorageRequest(MoveStorageRequestMessage msg) {
-        this.storage.move(msg.getMove());
+        this.storage.put(msg.getMove());
         log.debug("Imported storage [{}] from {}", msg.getMove(), sender());
     }
 
@@ -85,8 +101,15 @@ public class StorageManager extends AbstractActor {
     }
 
     private void onPropagateMessage(PropagateMessage msg) {
-    	log.debug("Put request received for backup of {}", msg.getAddress());
-        storage.addToPartition(msg.getAddress(), msg.getEntry().toHashMapEntry());
+    	this.storage.addToPartition(msg.getAddress(), msg.getBackup());
+        this.backups.put(msg.getAddress(), System.currentTimeMillis());
+        
+        for (Address address : this.backups.keySet()) {
+        	if (System.currentTimeMillis() - this.backups.get(address) > BACKUP_MAX_TIME_DURATION.toMillis()) {
+        		this.backups.remove(address);
+        		this.storage.removePartition(address);
+        	}
+        }  
     }
 
     public void onGetAll(GetterMessage msg) {
@@ -100,13 +123,7 @@ public class StorageManager extends AbstractActor {
     
     public void onRestoreRequest(RestoreRequestMessage msg) {
     	log.info("Restoring lost data from unreachable node");
-    	HashMap<String, String> restores = storage.removePartition(msg.getAddress());
-    	if (restores != null) {
-    		for (Map.Entry<String, String> entry : restores.entrySet()) {
-        		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry), sender()), self());
-        	}
-    	}
-    	for (Map.Entry<String, String> entry : storage.getAll().entrySet()) {
+    	for (Map.Entry<String, String> entry : storage.getPartition(msg.getAddress()).entrySet()) {
     		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry), sender()), self());
     	}
     }
@@ -132,7 +149,7 @@ public class StorageManager extends AbstractActor {
 
                 .match(GathererStorageMessage.class, this::onGathererStorage)
 
-                .match(RestoreRequestMessage.class, this::onRestoreRequest)
+                .match(RestoreRequestMessage.class, (msg) -> storage.containsPartition(msg.getAddress()), this::onRestoreRequest)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

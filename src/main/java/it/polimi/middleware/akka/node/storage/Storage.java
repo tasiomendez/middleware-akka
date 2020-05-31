@@ -20,7 +20,7 @@ public class Storage {
 	private final LoggingAdapter log;
 	private final Cluster cluster;
 
-	private final int partitionNumber;
+	private final int PARTITION_NUMBER;
 
 	private static Storage instance; 
 
@@ -31,7 +31,7 @@ public class Storage {
 		this.system = system;
 		this.log = Logging.getLogger(this.system, this);
 		this.cluster = Cluster.get(this.system);
-		this.partitionNumber = system.settings().config().getInt("clustering.partition.max");
+		this.PARTITION_NUMBER = this.system.settings().config().getInt("clustering.partition.max");
 	}
 	
 	/**
@@ -78,12 +78,8 @@ public class Storage {
 		}
 	}
 
-	public void move(Map<String, String> move) {
-		for (Map.Entry<String, String> entry : move.entrySet()) {
-			if (!this.storage.containsKey(entry.getKey())) {
-				this.storage.put(entry.getKey(), entry.getValue());
-			}
-		}
+	public void put(Map<String, String> map) {
+		this.storage.putAll(map);
 	}
 	
 	/**
@@ -104,6 +100,16 @@ public class Storage {
 		} catch (Exception e) {
 			return new ErrorMessage(e);
 		}
+	}
+	
+	/**
+	 * Remove given keys from storage
+	 * 
+	 * @param map of keys to remove
+	 */
+	public void remove(Map<String, String> map) {
+		for (Map.Entry<String, String> entry : map.entrySet())
+        	storage.remove(entry.getKey());
 	}
 	
 	/**
@@ -139,10 +145,10 @@ public class Storage {
 		}
 	}
 
-	public Map<String, String> getPartition(int fromKey, int toKey) {
+	public Map<String, String> getKeySpace(int fromKey, int toKey) {
 		final Map<String, String> result = new HashMap<>();
 		for (Map.Entry<String, String> entry : this.storage.entrySet()) {
-			final int key = Math.abs(entry.getKey().hashCode() % partitionNumber);
+			final int key = Math.abs(entry.getKey().hashCode() % PARTITION_NUMBER);
 			if (ClusterManager.isBetween(key, fromKey, toKey, false, true)) {
 				result.put(entry.getKey(), entry.getValue());
 			}
@@ -157,16 +163,26 @@ public class Storage {
 	 * @param storage storage to backup
 	 * @return data stored
 	 */
-	public String addToPartition(Address address, HashMap.Entry<String,String> entry) {
+	public String addToPartition(Address address, Map.Entry<String,String> entry) {
 		log.debug("Add new entry to backup from {}", address);
 		if (!this.backup.containsKey(address))
 			this.backup.put(address, new HashMap<String, String>());
 		return this.backup.get(address).put(entry.getKey(), entry.getValue());
 	}
-
-	public void addAllToPartition(Address address, Map<String,String> map) {
-		if (!this.backup.containsKey(address))
-			this.backup.put(address, new HashMap<>());
+	
+	/**
+	 * Add a new partition to the backup from an existing node.
+	 * 
+	 * @param address address of the backup node
+	 * @param storage storage to backup
+	 * @return data stored
+	 */
+	public void addToPartition(Address address, Map<String,String> map) {
+		if (!this.backup.containsKey(address)) {
+			log.info("Add new entry to backup from {}", address);
+			this.backup.put(address, new HashMap<String, String>());
+		}
+		this.backup.get(address).clear();
 		this.backup.get(address).putAll(map);
 	}
 	
