@@ -1,32 +1,34 @@
 package it.polimi.middleware.akka.messages.storage;
 
+import akka.actor.ActorRef;
+
 import java.io.Serializable;
 import java.util.HashMap;
-
-import akka.actor.ActorRef;
+import java.util.Map;
 
 public class PropagateRequestMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final HashMap<String, String> backup = new HashMap<>();
+    private final Map<String, String> backup;
     private final ActorRef originator;
 
     private int hopsToLive;
 
-    public PropagateRequestMessage(HashMap<String, String> backup, ActorRef originator, int hopsToLive) {
-        this.backup.putAll(backup);
+    public PropagateRequestMessage(Map<String, String> backup, ActorRef originator, int hopsToLive) {
+        this.backup = backup;
         this.originator = originator;
         this.hopsToLive = hopsToLive;
     }
 
     public PropagateRequestMessage(PutterMessage backup, ActorRef originator, int hopsToLive) {
+        this.backup = new HashMap<>();
         this.backup.put(backup.getKey(), backup.getValue());
         this.originator = originator;
         this.hopsToLive = hopsToLive;
     }
 
-    public final HashMap<String, String> getBackup() {
+    public final Map<String, String> getBackup() {
         return backup;
     }
 
