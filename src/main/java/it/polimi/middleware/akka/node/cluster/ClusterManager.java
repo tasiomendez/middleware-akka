@@ -1,8 +1,5 @@
 package it.polimi.middleware.akka.node.cluster;
 
-import java.util.Map;
-import java.util.TreeMap;
-
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -11,7 +8,9 @@ import akka.cluster.ClusterEvent.MemberRemoved;
 import akka.cluster.ClusterEvent.UnreachableMember;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.http.javadsl.model.StatusCodes;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
+import it.polimi.middleware.akka.messages.api.ErrorMessage;
 import it.polimi.middleware.akka.messages.api.SuccessMessage;
 import it.polimi.middleware.akka.messages.heartbeat.GetPredecessorRequestMessage;
 import it.polimi.middleware.akka.messages.heartbeat.GetPredecessorResponseMessage;
@@ -37,6 +36,9 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * The ClusterManager actor is in charge of managing the cluster taking into account if a new node is joined, if a node
@@ -356,13 +358,14 @@ public class ClusterManager extends AbstractActor {
 
 		final Reference partition = this.getFloorReference(key);
 		log.debug("Received GetPartitionGetterRequestMessage from [{}] with hash [{}]", sender().path(), key);
-		if (partition.getId() == this.self.getId()) {
-			log.debug("Partition with key [{}] not found on finger table. Forwarding message.", msg.getEntry().getKey());
-			this.getFarthestReference().getActor().forward(msg, getContext());
-		} else {
-			log.debug("Partition with key [{}] found on finger table. Forwarding message to [{}].", msg.getEntry().getKey(), partition.getId());
-			partition.getActor().forward(msg, getContext());
+		if (partition.equals(this.self)) {
+			log.warning("Partition with key [{}] not found on finger table.", msg.getEntry().getKey());
+			msg.getReplyTo().tell(new ErrorMessage(StatusCodes.LOOP_DETECTED), self());
+			return;
 		}
+
+		log.debug("Partition with key [{}] found on finger table. Forwarding message to [{}].", msg.getEntry().getKey(), partition.getId());
+		partition.getActor().forward(msg, getContext());
 	}
 
 	/**
@@ -376,11 +379,6 @@ public class ClusterManager extends AbstractActor {
 	 */
 	private Reference getFloorReference(int key) {
 		final Map.Entry<Integer, Reference> entry = this.fingerTable.floorEntry(key);
-		return (entry == null) ? this.fingerTable.floorEntry(this.fingerTable.lastKey()).getValue() : entry.getValue();
-	}
-
-	private Reference getFarthestReference() {
-		final Map.Entry<Integer, Reference> entry = this.fingerTable.lowerEntry(this.self.getId());
 		return (entry == null) ? this.fingerTable.lastEntry().getValue() : entry.getValue();
 	}
 
