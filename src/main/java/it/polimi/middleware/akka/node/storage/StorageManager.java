@@ -1,9 +1,5 @@
 package it.polimi.middleware.akka.node.storage;
 
-import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Address;
@@ -14,6 +10,8 @@ import it.polimi.middleware.akka.messages.api.ReplyMessage;
 import it.polimi.middleware.akka.messages.join.MoveStorageMessage;
 import it.polimi.middleware.akka.messages.join.MoveStorageRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
@@ -24,6 +22,10 @@ import it.polimi.middleware.akka.messages.storage.PropagateBackupMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PutterMessage;
 import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
+
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Actor in charge of managing data partitions. When data partition is needed to be updated, it handles all the
@@ -123,9 +125,12 @@ public class StorageManager extends AbstractActor {
     
     public void onRestoreRequest(RestoreRequestMessage msg) {
     	log.info("Restoring lost data from unreachable node");
-    	for (Map.Entry<String, String> entry : storage.getPartition(msg.getAddress()).entrySet()) {
-    		clusterManager.tell(new GetPartitionRequestMessage(new PutterMessage(entry), sender()), self());
-    	}
+    	clusterManager.tell(new GetPartitionBackupRequestMessage(storage.getPartition(msg.getAddress())), self());
+    }
+
+    private void onGetPartitionBackupResponse(GetPartitionBackupResponseMessage msg) {
+        log.info("Received restore request");
+        storage.put(msg.getBackup());
     }
 
     @Override
@@ -150,6 +155,8 @@ public class StorageManager extends AbstractActor {
                 .match(GathererStorageMessage.class, this::onGathererStorage)
 
                 .match(RestoreRequestMessage.class, (msg) -> storage.containsPartition(msg.getAddress()), this::onRestoreRequest)
+
+                .match(GetPartitionBackupResponseMessage.class, this::onGetPartitionBackupResponse)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();

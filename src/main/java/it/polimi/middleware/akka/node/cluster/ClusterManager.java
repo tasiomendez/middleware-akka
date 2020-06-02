@@ -24,6 +24,8 @@ import it.polimi.middleware.akka.messages.join.MoveStorageMessage;
 import it.polimi.middleware.akka.messages.join.MoveStorageRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GathererMessage;
 import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
@@ -404,6 +406,14 @@ public class ClusterManager extends AbstractActor {
 		}
 	}
 
+	private void onGetPartitionBackupRequest(GetPartitionBackupRequestMessage msg) {
+		if (cluster.selfMember().hasRole("master")) {
+			this.partitionManager.forward(msg, getContext());
+		} else {
+			this.master.forward(msg, getContext());
+		}
+	}
+
 	@Override
 	public Receive createReceive() {
 		return receiveBuilder()
@@ -445,9 +455,13 @@ public class ClusterManager extends AbstractActor {
 				.match(GetPartitionResponseMessage.class, this::onGetPartitionResponse)
 				.match(PropagateRequestMessage.class, this::onPropagateRequest)
 				.match(GetPartitionGetterRequestMessage.class, this::onGetPartitionGetterRequest)
-				.match(GetPartitionGetterResponseMessage.class, (msg) -> getContext().getParent().forward(msg, getContext()))
+				.match(GetPartitionGetterResponseMessage.class, msg -> getContext().getParent().forward(msg, getContext()))
 				.match(GathererStorageMessage.class, this::onGathererStorage)
 				.match(GathererMessage.class, this::onGatherer)
+
+				// Backup messages
+				.match(GetPartitionBackupRequestMessage.class, this::onGetPartitionBackupRequest)
+				.match(GetPartitionBackupResponseMessage.class, msg -> getContext().getParent().forward(msg, getContext()))
 
 				.matchAny(msg -> log.warning("Received unknown message: {}", msg))
 				.build();

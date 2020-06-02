@@ -9,6 +9,7 @@ import it.polimi.middleware.akka.messages.join.MasterNotificationMessage;
 import it.polimi.middleware.akka.messages.join.MoveStorageMessage;
 import it.polimi.middleware.akka.messages.join.MoveStorageRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GathererStorageMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionGetterResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.storage.PropagateMessage;
@@ -43,6 +44,8 @@ public class Node extends AbstractActor {
                 .match(PropagateMessage.class, msg -> storageManager.forward(msg, getContext()))
                 .match(GetPartitionResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
                 .match(GetPartitionGetterResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
+
+                .match(GetPartitionBackupResponseMessage.class, msg -> storageManager.forward(msg, getContext()))
 
                 .match(GathererStorageMessage.class, msg -> storageManager.forward(msg, getContext()))
 

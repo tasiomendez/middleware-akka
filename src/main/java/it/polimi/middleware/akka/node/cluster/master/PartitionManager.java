@@ -1,9 +1,5 @@
 package it.polimi.middleware.akka.node.cluster.master;
 
-import java.util.Map;
-import java.util.Random;
-import java.util.TreeMap;
-
 import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.cluster.Cluster;
@@ -13,11 +9,18 @@ import akka.event.LoggingAdapter;
 import it.polimi.middleware.akka.messages.CreateRingMessage;
 import it.polimi.middleware.akka.messages.join.IdRequestMessage;
 import it.polimi.middleware.akka.messages.join.IdResponseMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupRequestMessage;
+import it.polimi.middleware.akka.messages.storage.GetPartitionBackupResponseMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionRequestMessage;
 import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.TreeMap;
 
 /**
  * The PartitionManager actor belongs to the master node. It is in charge of keeping track of the members in the cluster
@@ -90,6 +93,26 @@ public class PartitionManager extends AbstractActor {
         partition.getActor().tell(new GetPartitionResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
     }
 
+    private void onGetPartitionBackupRequest(GetPartitionBackupRequestMessage msg) {
+        log.debug("Got request to restore [{}]", msg.getBackup());
+        // map the reference of the actor to the backup they will have to store
+        final Map<Reference, Map<String, String>> partitions = new HashMap<>();
+        for (Map.Entry<String, String> entry : msg.getBackup().entrySet()) {
+            // compute the key and get the reference
+            final int key = Math.abs(entry.getKey().hashCode() % PARTITION_NUMBER);
+            final Reference node = getCeilingReference(key);
+            // if the map doesn't have an entry for that key, create a new HashMap
+            partitions.putIfAbsent(node, new HashMap<>());
+            final Map<String, String> partition = partitions.get(node);
+            partition.put(entry.getKey(), entry.getValue());
+        }
+        // send the message to every actor
+        for (Map.Entry<Reference, Map<String, String>> partition : partitions.entrySet()) {
+            final Object message = new GetPartitionBackupResponseMessage(partition.getValue());
+            partition.getKey().getActor().tell(message, self());
+        }
+    }
+
     /**
      * Get random member from the TreeMap.
      *
@@ -126,6 +149,8 @@ public class PartitionManager extends AbstractActor {
                 .match(NewSuccessorRequestMessage.class, this::onNewSuccessorRequest)
 
                 .match(GetPartitionRequestMessage.class, this::onGetPartitionRequest)
+
+                .match(GetPartitionBackupRequestMessage.class, this::onGetPartitionBackupRequest)
 
                 .matchAny(msg -> log.warning("Received unknown message: {}", msg))
                 .build();
