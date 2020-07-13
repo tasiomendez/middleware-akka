@@ -38,7 +38,9 @@ import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
 import it.polimi.middleware.akka.node.cluster.master.PartitionManager;
+import it.polimi.middleware.akka.node.hash.HashFunction;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -54,6 +56,8 @@ public class ClusterManager extends AbstractActor {
 	private final int PARTITION_NUMBER = getContext().getSystem().settings().config().getInt("clustering.partition.max");
 	private final int REPLICATION_NUMBER = getContext().getSystem().settings().config().getInt("clustering.replication");
 	private final int FINGER_TABLE_SIZE = (int) (Math.log(this.PARTITION_NUMBER) / Math.log(2));
+
+	private final HashFunction hashFunction;
 
 	private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 	private final Cluster cluster = Cluster.get(getContext().system());
@@ -72,9 +76,11 @@ public class ClusterManager extends AbstractActor {
 	// Set as default to self. It will be updated to the real one after joining the cluster
 	private ActorRef master = getContext().self();
 
-	public ClusterManager() {
-		this.partitionManager = (cluster.selfMember().hasRole("master")) ? 
+	public ClusterManager() throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+		this.partitionManager = (cluster.selfMember().hasRole("master")) ?
 				getContext().actorOf(PartitionManager.props(), "partitionManager") : null;
+		Class<?> hashFunctionClass = Class.forName(getContext().getSystem().settings().config().getString("clustering.hash-function"));
+		this.hashFunction = (HashFunction) hashFunctionClass.getConstructor().newInstance();
 	}
 
 	/**
@@ -199,7 +205,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handles an incoming {@link FindSuccessorResponseMessage} that occurs when the successor has been found when asking
 	 * for it on a Heartbeat message.
-	 * 
+	 *
 	 * @param msg
 	 */
 	private void onFindSuccessorFingerTableResponse(FindSuccessorResponseMessage msg) {
@@ -297,7 +303,7 @@ public class ClusterManager extends AbstractActor {
 	/**
 	 * Handles an {@link MemberRemoved} message. When the member is removed from the cluster, the data it stored
 	 * is replicated into a new node.
-	 * 
+	 *
 	 * @param msg member removed
 	 */
 	private void onMemberRemoved(MemberRemoved msg) {
@@ -347,13 +353,13 @@ public class ClusterManager extends AbstractActor {
 
 	/**
 	 * If the key is between two entries in the Finger Table, the message is forwarded to the lower entry,
-	 * and it is done recursively until the node with the key is reached. In case the key is not in the 
+	 * and it is done recursively until the node with the key is reached. In case the key is not in the
 	 * finger table, the message is forwarded to the farthest node.
-	 * 
+	 *
 	 * @param msg
 	 */
 	private void onGetPartitionGetterRequest(GetPartitionGetterRequestMessage msg) {
-		final int key = Math.abs(msg.getEntry().getKey().hashCode() % PARTITION_NUMBER);
+		final int key = this.hashFunction.hash(msg.getEntry().getKey()) % PARTITION_NUMBER;
 		if (isBetween(key, this.predecessor.getId(), this.self.getId(), false, true)) {
 			log.debug("Partition with key [{}] found on current node [{}]", msg.getEntry().getKey(), this.self);
 			getContext().getParent().tell(new GetPartitionGetterResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
@@ -368,7 +374,8 @@ public class ClusterManager extends AbstractActor {
 			return;
 		}
 
-		log.debug("Partition with key [{}] found on finger table. Forwarding message to [{}].", msg.getEntry().getKey(), partition.getId());
+		log.debug("Partition with key [{}] found on finger table. Forwarding message to [{}]. Self is [{}]",
+				msg.getEntry().getKey(), partition.getId(), this.self.getId());
 		partition.getActor().forward(msg, getContext());
 	}
 
@@ -431,10 +438,10 @@ public class ClusterManager extends AbstractActor {
 				.match(MoveStorageRequestMessage.class, msg -> getContext().parent().forward(msg, getContext()))
 
 				.match(FindSuccessorRequestMessage.class, this::onFindSuccessorRequest)
-				.match(FindSuccessorResponseMessage.class, 
+				.match(FindSuccessorResponseMessage.class,
 						(msg) -> msg.getIdRequest() == this.self.getId(), // Current node asks for its successor
 						this::onFindSuccessorResponse)
-				.match(FindSuccessorResponseMessage.class, 
+				.match(FindSuccessorResponseMessage.class,
 						this::onFindSuccessorFingerTableResponse) // Answer to a FingerTable Heartbeat message
 
 				// HeartBeat messages

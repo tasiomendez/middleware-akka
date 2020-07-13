@@ -10,7 +10,9 @@ import it.polimi.middleware.akka.messages.api.ErrorMessage;
 import it.polimi.middleware.akka.messages.api.ReplyMessage;
 import it.polimi.middleware.akka.messages.api.SuccessMessage;
 import it.polimi.middleware.akka.node.cluster.ClusterManager;
+import it.polimi.middleware.akka.node.hash.HashFunction;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,16 +24,20 @@ public class Storage {
 
 	private final int PARTITION_NUMBER;
 
+	private final HashFunction hashFunction;
+
 	private static Storage instance; 
 
 	private HashMap<String, String> storage = new HashMap<>();
 	private HashMap<Address, HashMap<String, String>> backup = new HashMap<>();
 	
-	private Storage(ActorSystem system) {
+	private Storage(ActorSystem system) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
 		this.system = system;
 		this.log = Logging.getLogger(this.system, this);
 		this.cluster = Cluster.get(this.system);
 		this.PARTITION_NUMBER = this.system.settings().config().getInt("clustering.partition.max");
+		Class<?> hashFunctionClass = Class.forName(system.settings().config().getString("clustering.hash-function"));
+		hashFunction = (HashFunction) hashFunctionClass.getConstructor().newInstance();
 	}
 	
 	/**
@@ -41,7 +47,7 @@ public class Storage {
 	 * @param system Customized ActorSystem
 	 * @return instance
 	 */
-	public static Storage get(ActorSystem system) {
+	public static Storage get(ActorSystem system) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
 		if(instance == null)
             instance = new Storage(system);
         return instance;
@@ -53,7 +59,7 @@ public class Storage {
 	 * 
 	 * @return instance
 	 */
-	public static Storage get() {
+	public static Storage get() throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
 		if(instance == null)
             instance = new Storage(ActorSystem.create());
         return instance;
@@ -148,7 +154,7 @@ public class Storage {
 	public Map<String, String> getKeySpace(int fromKey, int toKey) {
 		final Map<String, String> result = new HashMap<>();
 		for (Map.Entry<String, String> entry : this.storage.entrySet()) {
-			final int key = Math.abs(entry.getKey().hashCode() % PARTITION_NUMBER);
+			final int key = this.hashFunction.hash(entry.getKey()) % PARTITION_NUMBER;
 			if (ClusterManager.isBetween(key, fromKey, toKey, false, true)) {
 				result.put(entry.getKey(), entry.getValue());
 			}

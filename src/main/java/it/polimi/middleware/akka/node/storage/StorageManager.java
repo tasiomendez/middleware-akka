@@ -23,6 +23,7 @@ import it.polimi.middleware.akka.messages.storage.PropagateMessage;
 import it.polimi.middleware.akka.messages.storage.PutterMessage;
 import it.polimi.middleware.akka.messages.storage.RestoreRequestMessage;
 
+import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,7 +45,7 @@ public class StorageManager extends AbstractActor {
     
     private final Supervisor supervisor = Supervisor.get(getContext().getSystem());
     
-    public StorageManager(ActorRef clusterManager) {
+    public StorageManager(ActorRef clusterManager) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
     	this.clusterManager = clusterManager;
     	log.info("Starting backup supervisor");
     	this.supervisor.start(this::supervisor);

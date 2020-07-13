@@ -16,7 +16,9 @@ import it.polimi.middleware.akka.messages.storage.GetPartitionResponseMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorRequestMessage;
 import it.polimi.middleware.akka.messages.update.NewSuccessorResponseMessage;
 import it.polimi.middleware.akka.node.Reference;
+import it.polimi.middleware.akka.node.hash.HashFunction;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -33,6 +35,8 @@ public class PartitionManager extends AbstractActor {
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Cluster cluster = Cluster.get(getContext().getSystem());
 
+    private final HashFunction hashFunction;
+
     // Random ID generator
     private final Random generator = new Random();
 
@@ -41,7 +45,7 @@ public class PartitionManager extends AbstractActor {
     private final TreeMap<Integer, Reference> members = new TreeMap<>();
     private final TreeMap<Integer, Integer> ids = new TreeMap<>();
 
-    public PartitionManager() {
+    public PartitionManager() throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
     	final int masterId = generator.nextInt(PARTITION_NUMBER);
         // Create ring at beginning
         getContext().getParent().tell(new CreateRingMessage(masterId), self());
@@ -50,6 +54,8 @@ public class PartitionManager extends AbstractActor {
         final Reference node = new Reference(masterId, getContext().getParent());
         this.members.put(node.getId(), node);
         this.ids.put(getContext().self().path().address().hashCode(), node.getId());
+        Class<?> hashFunctionClass = Class.forName(getContext().getSystem().settings().config().getString("clustering.hash-function"));
+        this.hashFunction = (HashFunction) hashFunctionClass.getConstructor().newInstance();
     }
 
     public static Props props() {
@@ -87,7 +93,7 @@ public class PartitionManager extends AbstractActor {
     }
 
     private void onGetPartitionRequest(GetPartitionRequestMessage msg) {
-    	final int key = Math.abs(msg.getEntry().getKey().hashCode() % PARTITION_NUMBER);
+    	final int key = this.hashFunction.hash(msg.getEntry().getKey()) % PARTITION_NUMBER;
         final Reference partition = getCeilingReference(key);
         log.debug("Partition for key [{}] with hash [{}] is [{}]", msg.getEntry().getKey(), key, partition.getId());
         partition.getActor().tell(new GetPartitionResponseMessage(msg.getEntry(), msg.getReplyTo()), self());
@@ -99,7 +105,7 @@ public class PartitionManager extends AbstractActor {
         final Map<Reference, Map<String, String>> partitions = new HashMap<>();
         for (Map.Entry<String, String> entry : msg.getBackup().entrySet()) {
             // compute the key and get the reference
-            final int key = Math.abs(entry.getKey().hashCode() % PARTITION_NUMBER);
+            final int key = this.hashFunction.hash(entry.getKey()) % PARTITION_NUMBER;
             final Reference node = getCeilingReference(key);
             // if the map doesn't have an entry for that key, create a new HashMap
             partitions.putIfAbsent(node, new HashMap<>());
