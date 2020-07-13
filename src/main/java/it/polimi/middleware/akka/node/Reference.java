@@ -73,8 +73,8 @@ public class Reference implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Reference reference = (Reference) o;
-        return Objects.equals(id, reference.id) &&
-                Objects.equals(actor, reference.actor);
+        return id.equals(reference.id) &&
+                actor.equals(reference.actor);
     }
 
     @Override
