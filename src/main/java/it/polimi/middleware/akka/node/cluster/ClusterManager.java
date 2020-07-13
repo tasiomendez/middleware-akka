@@ -316,12 +316,14 @@ public class ClusterManager extends AbstractActor {
 	}
 
 	private void onGetPartitionResponse(GetPartitionResponseMessage msg) {
+		if (this.successor.isNull())
+			return;
 		getContext().getParent().forward(msg, getContext());
 		log.debug("Propagating PutterMessage to successor nodes");
 		final PropagateRequestMessage message = new PropagateRequestMessage(msg.getEntry(), self(), REPLICATION_NUMBER - 1);
-		successor.getActor().tell(message, self());
+		this.successor.getActor().tell(message, self());
 	}
-    
+
     private void onPropagateBackup(PropagateBackupMessage msg) {
     	if (this.successor.isNull())
     		return;
