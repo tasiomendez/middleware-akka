@@ -115,12 +115,17 @@ public class ClusterManager extends AbstractActor {
 	 * the system.
 	 */
 	private void heartbeat() {
-		this.successor.getActor().tell(new GetPredecessorRequestMessage(), self());
-		for (Integer key : fingerTable.keySet()) {
-			self().tell(new FindSuccessorRequestMessage(key), self());
-		}
 		log.debug("Ring set as {} - {} - {}", this.predecessor, this.self, this.successor);
 		log.debug("Finger table set as {}", fingerTable);
+
+		this.successor.getActor().tell(new GetPredecessorRequestMessage(), self());
+
+		// ask to update one finger of the finger-table at every heartbeat, sequentially
+		final int key = (this.self.getId() + (int) Math.pow(2, fingerIndex)) % PARTITION_NUMBER;
+		log.debug("Asking successor for node with id {}", key);
+		this.successor.getActor().tell(new FindSuccessorRequestMessage(key), self());
+		fingerIndex += 1;
+		fingerIndex = fingerIndex % FINGER_TABLE_SIZE;
 	}
 
 	/**
@@ -170,12 +175,8 @@ public class ClusterManager extends AbstractActor {
 	 * @param msg find successor request message
 	 */
 	private void onFindSuccessorRequest(FindSuccessorRequestMessage msg) {
-		// log.debug("Received FindSuccessorRequestMessage (self={}, successor={}, requester={})",
-		//		this.self, this.successor, msg);
-
 		if (isBetween(msg.getRequest(), this.self.getId(), this.successor.getId(), false, true)) {
 			// reply directly to the request
-			// log.debug("Successor found for requester={}", msg);
 			sender().tell(new FindSuccessorResponseMessage(this.successor, msg.getRequest()), self());
 		} else {
 			final Reference nextNode = this.closetPrecedingNode(msg.getRequest());
@@ -366,6 +367,12 @@ public class ClusterManager extends AbstractActor {
 			return;
 		}
 
+		if (!msg.alive()) {
+			log.error("GetPartitionGetterRequestMessage forwarded too many times, dropping");
+			msg.getReplyTo().tell(new ErrorMessage(StatusCodes.LOOP_DETECTED), self());
+			return;
+		}
+
 		final Reference partition = this.getFloorReference(key);
 		log.debug("Received GetPartitionGetterRequestMessage from [{}] with hash [{}]", sender().path(), key);
 		if (partition.equals(this.self)) {
@@ -376,7 +383,7 @@ public class ClusterManager extends AbstractActor {
 
 		log.debug("Partition with key [{}] found on finger table. Forwarding message to [{}]. Self is [{}]",
 				msg.getEntry().getKey(), partition.getId(), this.self.getId());
-		partition.getActor().forward(msg, getContext());
+		partition.getActor().forward(msg.forward(), getContext());
 	}
 
 	/**

@@ -35,6 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class StorageManager extends AbstractActor {
 	
 	private static final Duration BACKUP_MAX_TIME_DURATION = Duration.ofSeconds(30);
+    private final int PARTITION_NUMBER = getContext().getSystem().settings().config().getInt("clustering.partition.max");
+    private final int FINGER_TABLE_SIZE = (int) (Math.log(this.PARTITION_NUMBER) / Math.log(2));
 
     private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
     private final Storage storage = Storage.get(getContext().getSystem());
@@ -90,7 +92,7 @@ public class StorageManager extends AbstractActor {
 
     private void onGet(GetterMessage msg) {
         log.debug("Get request received. Asking for partition.");
-        clusterManager.tell(new GetPartitionGetterRequestMessage(msg, sender()), self());
+        clusterManager.tell(new GetPartitionGetterRequestMessage(FINGER_TABLE_SIZE + 1, msg, sender()), self());
     }
 
     private void onPut(PutterMessage msg) {
