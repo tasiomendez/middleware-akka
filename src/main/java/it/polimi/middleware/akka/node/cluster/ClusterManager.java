@@ -76,6 +76,8 @@ public class ClusterManager extends AbstractActor {
 	// Set as default to self. It will be updated to the real one after joining the cluster
 	private ActorRef master = getContext().self();
 
+	private int fingerIndex = 0;
+
 	public ClusterManager() throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
 		this.partitionManager = (cluster.selfMember().hasRole("master")) ?
 				getContext().actorOf(PartitionManager.props(), "partitionManager") : null;
@@ -106,7 +108,7 @@ public class ClusterManager extends AbstractActor {
 	public void initFingerTable() {
 		// Initialize finger table		
 		for (int i = 0; i < FINGER_TABLE_SIZE; i++) {
-			this.fingerTable.put((self.getId() + (int) Math.pow(2, i)) % PARTITION_NUMBER, this.self);
+			this.fingerTable.put((this.self.getId() + (int) Math.pow(2, i)) % PARTITION_NUMBER, this.self);
 		}
 	}
 

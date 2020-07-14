@@ -8,8 +8,8 @@ import java.time.Duration;
 
 public class HeartBeat {
 	
-	private static final Duration INITIAL_DELAY = Duration.ofSeconds(6);
-	private static final Duration BETWEEN_DELAY = Duration.ofSeconds(6);
+	private static final Duration INITIAL_DELAY = Duration.ofSeconds(2);
+	private static final Duration BETWEEN_DELAY = Duration.ofSeconds(2);
 	
 	private final ActorSystem system;
 	private final LoggingAdapter log;
